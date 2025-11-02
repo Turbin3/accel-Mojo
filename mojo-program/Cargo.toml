@@ -1,0 +1,17 @@
+[package]
+name = "mojo-program"
+version = "0.1.0"
+edition = "2021"
+
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+pinocchio = "0.9.2"
+pinocchio-system = "0.3.0"
+pinocchio-token = "0.4.0"
+pinocchio-pubkey = { git = "https://github.com/anza-xyz/pinocchio.git" }
+pinocchio-log = "0.5.1"
+pinocchio-associated-token-account = "0.2.0"
+bytemuck = { version = "1.23.0", features = ["derive"] }
