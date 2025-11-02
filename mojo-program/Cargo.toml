@@ -15,3 +15,20 @@ pinocchio-pubkey = { git = "https://github.com/anza-xyz/pinocchio.git" }
 pinocchio-log = "0.5.1"
 pinocchio-associated-token-account = "0.2.0"
 bytemuck = { version = "1.23.0", features = ["derive"] }
+
+
+[dev-dependencies]
+litesvm = "0.6.1"
+solana-instruction = "2.2.1"
+solana-keypair = "2.2.1"
+solana-native-token = "2.2.1"
+solana-pubkey = "2.2.1"
+solana-signer = "2.2.1"
+solana-system-interface = "1.0.0"
+solana-transaction = "2.2.1"
+solana-message = "2.2.1"
+solana-sdk-ids = "2.2.1"
+solana-rpc-client = "3.0.3"
+solana-address = "1.0.0"
+solana-account = "2.2.1"
+pinocchio-log = "0.5.1"

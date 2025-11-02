@@ -4,7 +4,9 @@ use crate::instructions::MojoInstructions;
 
 mod instructions;
 mod state;
+mod tests;
 
+entrypoint!(process_instruction);
 pinocchio_pubkey::declare_id!("3jyHnrGq1z9YiGyx5QEUDR5hnZ7PYeYW5stFUq2skYZz");
 
 pub fn process_instruction(
@@ -22,11 +24,11 @@ pub fn process_instruction(
         MojoInstructions::Initialize => {
             instructions::create_state_account(accounts, data)?;
         }
-        MojoInstructions::CreateAccount => {}
-        MojoInstructions::DelegagteAccount => {}
-        MojoInstructions::Commit => {}
-        MojoInstructions::UpdateDelegatedAccount => {}
-        MojoInstructions::UnDelegateAccount => {}
+        // MojoInstructions::CreateAccount => {}
+        // MojoInstructions::DelegagteAccount => {}
+        // MojoInstructions::Commit => {}
+        // MojoInstructions::UpdateDelegatedAccount => (),
+        // MojoInstructions::UnDelegateAccount => (),
         _ => return Err(pinocchio::program_error::ProgramError::InvalidInstructionData),
     }
     Ok(())

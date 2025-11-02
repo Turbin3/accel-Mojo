@@ -9,4 +9,7 @@ pub struct GenIxHandler {
 
 impl GenIxHandler {
     pub const LEN: usize = core::mem::size_of::<GenIxHandler>();
+    pub fn to_bytes(&self) -> Vec<u8> {
+        bytemuck::bytes_of(self).to_vec()
+    }
 }
