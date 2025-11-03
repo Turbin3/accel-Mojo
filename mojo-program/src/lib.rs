@@ -21,7 +21,7 @@ pub fn process_instruction(
         .ok_or(pinocchio::program_error::ProgramError::InvalidInstructionData)?;
 
     match MojoInstructions::try_from(discriminator)? {
-        MojoInstructions::Initialize => {
+        MojoInstructions::CreateAccount => {
             instructions::create_state_account(accounts, data)?;
         }
         // MojoInstructions::CreateAccount => {}
