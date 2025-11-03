@@ -5,7 +5,10 @@ mod tests {
     use litesvm::LiteSVM;
     use std::{io::Error, string};
 
-    use pinocchio::sysvars::rent::{Rent, RENT_ID};
+    use pinocchio::{
+        msg,
+        sysvars::rent::{Rent, RENT_ID},
+    };
     use pinocchio_log::log;
     use solana_instruction::{AccountMeta, Instruction};
     use solana_keypair::Keypair;
@@ -91,11 +94,17 @@ mod tests {
 
         let my_state_data = MyPosition { x: 24, y: 12 };
         // TODO error here
+
+        let mut combined = [0u8; 96];
+        combined[..10].copy_from_slice(b"fundraiser".as_ref());
+        combined[10..42].copy_from_slice(creator.pubkey().as_ref());
+        combined[42..].fill(0);
+
+        log!("seed passed {}", &combined);
+
         let mojo_data = crate::state::GenIxHandler {
-            seeds: [b"fundraiser".as_ref(), creator.pubkey().as_ref()]
-                .concat()
-                .try_into()
-                .unwrap(),
+            seeds: combined,
+            seeds_size: 42u64.to_le_bytes(),
             size: my_state_data.length().to_le_bytes(),
         };
         let create_ix_data = [
