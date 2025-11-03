@@ -15,6 +15,7 @@ pinocchio-pubkey = { git = "https://github.com/anza-xyz/pinocchio.git" }
 pinocchio-log = "0.5.1"
 pinocchio-associated-token-account = "0.2.0"
 bytemuck = { version = "1.23.0", features = ["derive"] }
+ephemeral-rollups-pinocchio = "=0.3.7"
 
 
 [dev-dependencies]
