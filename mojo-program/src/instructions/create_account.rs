@@ -1,10 +1,11 @@
 use pinocchio::{
     account_info::AccountInfo,
     instruction::Signer,
-    seeds,
+    pubkey, seeds,
     sysvars::{rent::Rent, Sysvar},
     ProgramResult,
 };
+
 use pinocchio_system::instructions::CreateAccount;
 
 use crate::state::GenIxHandler;
@@ -18,6 +19,8 @@ pub fn create_state_account(accounts: &[AccountInfo], data: &[u8]) -> ProgramRes
     let mojo_data = &data[0..GenIxHandler::LEN];
     let mojo_ser_data = bytemuck::try_pod_read_unaligned::<GenIxHandler>(mojo_data).unwrap();
 
+    let [seed1, seed2, seed3, seed4, seed5] = mojo_ser_data.get_seed_slices();
+
     // checks
     // check that maker is a signer ✅
     assert!(&creator.is_signer(), "Creator should be a signer");
@@ -27,15 +30,20 @@ pub fn create_state_account(accounts: &[AccountInfo], data: &[u8]) -> ProgramRes
         "Account should be empty"
     );
     // check that owner of account_to_create is this program
-    assert_eq!(
-        account_to_create.owner(),
-        &crate::ID,
-        "Illegal Account Owner"
-    );
 
-    // create_account
-    let seeds = seeds!(&mojo_ser_data.seeds);
+    // NOTE Always use all 5 seeds
+    let (account_pda, bump) =
+        pubkey::find_program_address(&[seed1, seed2, seed3, seed4, seed5], &crate::ID);
+
+    let seed_bump = [bump];
+    let seeds = seeds!(seed1, seed2, seed3, seed4, seed5, &seed_bump);
     let signer = Signer::from(&seeds);
+
+    assert_eq!(
+        &account_pda,
+        account_to_create.key(),
+        "You provided the wrong user pda"
+    );
 
     CreateAccount {
         from: creator,
