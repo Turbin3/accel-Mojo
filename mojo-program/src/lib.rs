@@ -10,6 +10,8 @@ mod tests;
 entrypoint!(process_instruction);
 pinocchio_pubkey::declare_id!("3jyHnrGq1z9YiGyx5QEUDR5hnZ7PYeYW5stFUq2skYZz");
 
+use pinocchio_log::log;
+
 pub fn process_instruction(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
@@ -22,8 +24,7 @@ pub fn process_instruction(
         .ok_or(pinocchio::program_error::ProgramError::InvalidInstructionData)?;
 
     match MojoInstructions::try_from(discriminator)? {
-        // 0xAbim: Initialize and CreateAccount both use the same handler
-        MojoInstructions::Initialize | MojoInstructions::CreateAccount => {
+        MojoInstructions::CreateAccount => {
             instructions::create_state_account(accounts, data)?;
         }
         MojoInstructions::DelegateAccount => {
