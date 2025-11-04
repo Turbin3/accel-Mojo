@@ -1,5 +1,8 @@
 use bytemuck::{Pod, Zeroable};
 
+extern crate alloc;
+pub use alloc::vec::Vec;
+
 #[repr(C)]
 #[derive(Pod, Zeroable, Clone, Copy, Debug, PartialEq)]
 pub struct GenIxHandler {
