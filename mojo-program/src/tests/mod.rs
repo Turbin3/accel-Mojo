@@ -18,11 +18,11 @@ mod tests {
     use solana_signer::Signer;
     use solana_transaction::Transaction;
 
-    use crate::state::GenIxHandler;
-
     // use crate::instructions::MojoInstructions::CreateAccount;
 
     const PROGRAM_ID: Pubkey = Pubkey::new_from_array(crate::ID);
+    const LOCAL_ER: &str = "mAGicPQYBMvcYveUZA5F5UNNwyHvfYh5xkLS2Fr1mev";
+    Pubkey
 
     fn program_id() -> Pubkey {
         PROGRAM_ID
@@ -58,15 +58,10 @@ mod tests {
         svm.add_program(program_id(), bytes);
 
         // Derive the PDA for the escrow account using the maker's public key and a seed value
-        let mut mojo_data = GenIxHandler::new(224u64.to_le_bytes()); // 224 is a dummy value here since we're not directly using it
-
-        // Seeds start as all zeros, just fill what you need
-        let fundraiser_slice = b"fundrais"; // 8 bytes exactly
-        mojo_data
-            .fill_second(fundraiser_slice.try_into().unwrap())
-            .fill_third(payer.pubkey().as_ref().try_into().unwrap());
-        let account_to_create =
-            Pubkey::find_program_address(&mojo_data.get_seed_slices(), &PROGRAM_ID);
+        let account_to_create = Pubkey::find_program_address(
+            &[b"fundraiser".as_ref(), payer.pubkey().as_ref()],
+            &PROGRAM_ID,
+        );
 
         let pda = String::from(account_to_create.0.to_string());
         log!("{}", &*pda);
@@ -93,14 +88,13 @@ mod tests {
 
     #[test]
     pub fn create_account() -> Result<(), Error> {
-        let (mut svm, state) = setup();
+        let (mut svm, mut state) = setup();
 
         let creator = state.creator;
         let account_to_create = state.account_to_create;
         let system_program = state.system_program;
 
         let my_state_data = MyPosition { x: 24, y: 12 };
-<<<<<<< HEAD
         // TODO error here
 
         let mut combined = [0u8; 96];
@@ -115,29 +109,6 @@ mod tests {
             seeds_size: 42u64.to_le_bytes(),
             size: my_state_data.length().to_le_bytes(),
         };
-=======
-
-        // let user_seeds = [
-        //     b"".as_ref(),
-        //     b"fundrais".as_ref(),
-        //     creator.pubkey().as_ref(),
-        //     b"".as_ref(),
-        //     b"".as_ref(),
-        // ]
-        // .concat();
-
-        // all of these would be handled on the sdk
-
-        let mut mojo_data = GenIxHandler::new(my_state_data.length().to_le_bytes());
-        // Seeds start as all zeros, just fill what you need
-        let fundraiser_slice = b"fundrais"; // 8 bytes exactly
-        mojo_data
-            .fill_second(fundraiser_slice.try_into().unwrap())
-            .fill_third(creator.pubkey().as_ref().try_into().unwrap());
-
-        // const MAX_LEN: usize = 128;
-
->>>>>>> origin/create-account-cleanup
         let create_ix_data = [
             vec![crate::instructions::MojoInstructions::CreateAccount as u8],
             mojo_data.to_bytes(),
@@ -163,8 +134,8 @@ mod tests {
 
         // Send the transaction and capture the result
         let tx = svm.send_transaction(transaction).unwrap();
-        // msg!("tx logs: {}", tx.logs);
-        log!("\nCreate Account");
+        // msg!("tx logs: {:#?}", tx.logs);
+        log!("\nAdmin Claim transaction sucessful");
         log!("CUs Consumed: {}", tx.compute_units_consumed);
         Ok(())
     }
