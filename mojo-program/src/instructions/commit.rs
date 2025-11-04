@@ -9,7 +9,7 @@ use crate::state::GenIxHandler;
 
 pub fn process_commit_instruction(
     accounts: &[AccountInfo],
-    instruction_data: &[u8],
+    _instruction_data: &[u8],
 ) -> ProgramResult {
     // need to discuss , how to handle magic context and magic program
     let [creator, creator_account, magic_context, magic_program, _system_program] = accounts else {
@@ -68,7 +68,6 @@ pub fn process_commit_instruction(
         return Err(ProgramError::InvalidSeeds);
     }
 
-    //CURRENTLY GIVING ERROR - 
     // comitting the updates
     commit_accounts(
         creator,
@@ -76,7 +75,7 @@ pub fn process_commit_instruction(
         &accounts[1..2], // expects creator_account as &[AccountInfo]
         magic_context,
         magic_program,
-    );
+    )?;
 
     Ok(())
 }
