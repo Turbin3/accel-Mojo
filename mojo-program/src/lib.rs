@@ -1,3 +1,4 @@
+#![allow(unexpected_cfgs)]
 use pinocchio::{account_info::AccountInfo, entrypoint, pubkey::Pubkey, ProgramResult};
 
 use crate::instructions::MojoInstructions;
@@ -26,7 +27,9 @@ pub fn process_instruction(
         }
         // MojoInstructions::CreateAccount => {}
         // MojoInstructions::DelegagteAccount => {}
-        // MojoInstructions::Commit => {}
+        MojoInstructions::Commit => {
+            instructions::process_commit_instruction(accounts, data)?;
+        }
         // MojoInstructions::UpdateDelegatedAccount => (),
         // MojoInstructions::UnDelegateAccount => (),
         _ => return Err(pinocchio::program_error::ProgramError::InvalidInstructionData),
