@@ -2,6 +2,7 @@ use pinocchio::{account_info::AccountInfo, entrypoint, pubkey::Pubkey, ProgramRe
 
 use crate::instructions::MojoInstructions;
 
+mod constants;
 mod instructions;
 mod state;
 mod tests;
@@ -21,15 +22,20 @@ pub fn process_instruction(
         .ok_or(pinocchio::program_error::ProgramError::InvalidInstructionData)?;
 
     match MojoInstructions::try_from(discriminator)? {
-        MojoInstructions::CreateAccount => {
+        // 0xAbim: Initialize and CreateAccount both use the same handler
+        MojoInstructions::Initialize | MojoInstructions::CreateAccount => {
             instructions::create_state_account(accounts, data)?;
         }
-        // MojoInstructions::CreateAccount => {}
-        // MojoInstructions::DelegagteAccount => {}
-        // MojoInstructions::Commit => {}
-        // MojoInstructions::UpdateDelegatedAccount => (),
-        // MojoInstructions::UnDelegateAccount => (),
-        _ => return Err(pinocchio::program_error::ProgramError::InvalidInstructionData),
+        MojoInstructions::DelegateAccount => {
+            instructions::process_delegate_account(accounts, instruction_data)?;
+        }
+        MojoInstructions::UndelegateAccount => {
+            instructions::process_undelegate_account(accounts, instruction_data)?;
+        }
+        // 0xAbim: TODO - Implement these instructions
+        MojoInstructions::Commit | MojoInstructions::UpdateDelegatedAccount => {
+            return Err(pinocchio::program_error::ProgramError::InvalidInstructionData);
+        }
     }
     Ok(())
 }

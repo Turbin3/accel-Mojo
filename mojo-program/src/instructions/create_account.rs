@@ -1,12 +1,10 @@
 use pinocchio::{
     account_info::AccountInfo,
-    instruction::{Seed, Signer},
-    log, msg, pubkey, seeds,
+    instruction::Signer,
+    seeds,
     sysvars::{rent::Rent, Sysvar},
     ProgramResult,
 };
-
-use pinocchio_log::log;
 use pinocchio_system::instructions::CreateAccount;
 
 use crate::state::GenIxHandler;
@@ -22,57 +20,35 @@ pub fn create_state_account(accounts: &[AccountInfo], data: &[u8]) -> ProgramRes
 
     // checks
     // check that maker is a signer ✅
-    assert!(creator.is_signer(), "Creator should be a signer");
+    assert!(&creator.is_signer(), "Creator should be a signer");
     // check that account_to_create is empty
-    assert!(account_to_create.data_is_empty(), "Account should be empty");
-    // // check that owner of account_to_create is this program
-    // assert_eq!(
-    //     account_to_create.owner(),
-    //     &crate::ID,
-    //     "Illegal Account Owner"
-    // );
+    assert!(
+        &account_to_create.data_is_empty(),
+        "Account should be empty"
+    );
+    // check that owner of account_to_create is this program
+    assert_eq!(
+        account_to_create.owner(),
+        &crate::ID,
+        "Illegal Account Owner"
+    );
 
     // create_account
-    let seeds_size = *mojo_ser_data.seeds_size.first().unwrap() as usize;
-
-    log!("seed size {}", seeds_size);
-    // log!()
-    let seeds_first_slice = &mojo_ser_data.seeds[0..10]; // need to know this size in advance
-    let seeds_second_slice = &mojo_ser_data.seeds[10..seeds_size]; // need to know how many seed terms are there to separate
-
-    log!("both seeds {}, {}", seeds_first_slice, seeds_second_slice);
-
-    // let seeds = seeds!(seeds_first_slice, seeds_second_slice);
-
-    let seeds = &[seeds_first_slice, seeds_second_slice];
-
-    let (derived_pda, bump) = pubkey::find_program_address(seeds, &crate::id());
-
-    let bump_binding = [bump];
-
-    // create fundraiser
-    let signer_seeds = [
-        Seed::from(seeds_first_slice),
-        Seed::from(seeds_second_slice),
-        Seed::from(&bump_binding),
-    ];
-
-    // let seeds = seeds!(&mojo_ser_data.seeds[1..seeds_size]);
-    // let signer = Signer::from(&seeds);
-    let signers: [Signer<'_, '_>; 1] = [Signer::from(&signer_seeds[..])];
+    let seeds = seeds!(&mojo_ser_data.seeds);
+    let signer = Signer::from(&seeds);
 
     CreateAccount {
         from: creator,
         lamports: Rent::get()?.minimum_balance(usize::from_le_bytes(mojo_ser_data.size)),
         owner: &crate::ID,
         space: u64::from_le_bytes(mojo_ser_data.size),
-        to: account_to_create,
+        to: &*account_to_create,
     }
-    .invoke_signed(&signers)?;
+    .invoke_signed(&[signer])?;
 
     let mut some_fist_account = account_to_create.try_borrow_mut_data().unwrap();
 
-    // // this will modify the account state
+    // this will modify the account state
     some_fist_account.copy_from_slice(&data[GenIxHandler::LEN..]);
     Ok(())
 }
