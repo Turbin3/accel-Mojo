@@ -1853,6 +1853,7 @@ dependencies = [
  "pinocchio-pubkey 0.3.0 (git+https://github.com/anza-xyz/pinocchio.git)",
  "pinocchio-system",
  "pinocchio-token",
+ "sha2 0.10.9",
  "solana-account 2.2.1",
  "solana-address",
  "solana-instruction 2.2.1",

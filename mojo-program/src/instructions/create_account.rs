@@ -33,29 +33,21 @@ pub fn create_state_account(accounts: &[AccountInfo], data: &[u8]) -> ProgramRes
     // );
 
     // create_account
-    let seeds_size = *mojo_ser_data.seeds_size.first().unwrap() as usize;
+    let seeds_data = &mojo_ser_data.seeds; // need to know this size in advance
 
-    log!("seed size {}", seeds_size);
-    // log!()
-    let seeds_first_slice = &mojo_ser_data.seeds[0..10]; // need to know this size in advance
-    let seeds_second_slice = &mojo_ser_data.seeds[10..seeds_size]; // need to know how many seed terms are there to separate
+    log!("digest seeds {}", seeds_data);
 
-    log!("both seeds {}, {}", seeds_first_slice, seeds_second_slice);
-
-    // let seeds = seeds!(seeds_first_slice, seeds_second_slice);
-
-    let seeds = &[seeds_first_slice, seeds_second_slice];
-
+    let seeds = &[seeds_data, creator.key().as_ref()];
     let (derived_pda, bump) = pubkey::find_program_address(seeds, &crate::id());
-
     let bump_binding = [bump];
 
     // create fundraiser
     let signer_seeds = [
-        Seed::from(seeds_first_slice),
-        Seed::from(seeds_second_slice),
+        Seed::from(seeds_data),
+        Seed::from(creator.key().as_ref()),
         Seed::from(&bump_binding),
     ];
+    // let signer_seeds = seeds!(seeds_first_slice, seeds_second_slice, &bump_binding);
 
     // let seeds = seeds!(&mojo_ser_data.seeds[1..seeds_size]);
     // let signer = Signer::from(&seeds);

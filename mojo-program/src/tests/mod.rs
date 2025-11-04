@@ -1,5 +1,12 @@
+mod utils;
+use utils::helpers::*;
+use utils::sdk_calls as sdk;
+
+use crate::encode_packed;
+
 #[cfg(test)]
 mod tests {
+    use super::*;
 
     use bytemuck::{Pod, Zeroable};
     use litesvm::LiteSVM;
@@ -10,6 +17,7 @@ mod tests {
         sysvars::rent::{Rent, RENT_ID},
     };
     use pinocchio_log::log;
+    use sha2::{Digest, Sha256};
     use solana_instruction::{AccountMeta, Instruction};
     use solana_keypair::Keypair;
     use solana_message::Message;
@@ -56,8 +64,9 @@ mod tests {
         svm.add_program(program_id(), bytes);
 
         // Derive the PDA for the escrow account using the maker's public key and a seed value
+        let combined = encode_packed!(b"fundraiser", payer.pubkey().as_ref());
         let account_to_create = Pubkey::find_program_address(
-            &[b"fundraiser".as_ref(), payer.pubkey().as_ref()],
+            &[&compute_hash(&combined), payer.pubkey().as_ref()],
             &PROGRAM_ID,
         );
 
@@ -95,16 +104,12 @@ mod tests {
         let my_state_data = MyPosition { x: 24, y: 12 };
         // TODO error here
 
-        let mut combined = [0u8; 96];
-        combined[..10].copy_from_slice(b"fundraiser".as_ref());
-        combined[10..42].copy_from_slice(creator.pubkey().as_ref());
-        combined[42..].fill(0);
-
-        log!("seed passed {}", &combined);
+        // Input from our Rust SDK
+        let combined = encode_packed!(b"fundraiser", creator.pubkey().as_ref());
+        let digest = compute_hash(&combined);
 
         let mojo_data = crate::state::GenIxHandler {
-            seeds: combined,
-            seeds_size: 42u64.to_le_bytes(),
+            seeds: digest,
             size: my_state_data.length().to_le_bytes(),
         };
         let create_ix_data = [
@@ -125,13 +130,9 @@ mod tests {
             data: create_ix_data,
         };
 
-        let message = Message::new(&[create_ix], Some(&creator.pubkey()));
-        let recent_blockhash = svm.latest_blockhash();
-
-        let transaction = Transaction::new(&[&creator], message, recent_blockhash);
-
-        // Send the transaction and capture the result
-        let tx = svm.send_transaction(transaction).unwrap();
+        let tx = send_singed_tx(&mut svm, create_ix, &creator)
+            .map_err(|e| format!("[create_account] Instrution create_account Failed: {:?}", e))
+            .unwrap();
         // msg!("tx logs: {:#?}", tx.logs);
         log!("\nAdmin Claim transaction sucessful");
         log!("CUs Consumed: {}", tx.compute_units_consumed);

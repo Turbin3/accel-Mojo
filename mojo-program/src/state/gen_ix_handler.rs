@@ -6,8 +6,11 @@ pub use alloc::vec::Vec;
 #[repr(C)]
 #[derive(Pod, Zeroable, Clone, Copy, Debug, PartialEq)]
 pub struct GenIxHandler {
-    pub seeds_size: [u8; 8],
-    pub seeds: [u8; 96],
+    // TODO: Unneeded
+    // pub seeds_size: [u8; 8],
+
+    // seeds are represented as a sha256
+    pub seeds: [u8; 32],
     pub size: [u8; 8],
 }
 
