@@ -1,12 +1,11 @@
 use pinocchio::{
     account_info::AccountInfo,
-    instruction::{Seed, Signer},
-    log, msg, pubkey, seeds,
+    instruction::Signer,
+    pubkey, seeds,
     sysvars::{rent::Rent, Sysvar},
     ProgramResult,
 };
 
-use pinocchio_log::log;
 use pinocchio_system::instructions::CreateAccount;
 
 use crate::state::GenIxHandler;
@@ -20,46 +19,31 @@ pub fn create_state_account(accounts: &[AccountInfo], data: &[u8]) -> ProgramRes
     let mojo_data = &data[0..GenIxHandler::LEN];
     let mojo_ser_data = bytemuck::try_pod_read_unaligned::<GenIxHandler>(mojo_data).unwrap();
 
+    let [seed1, seed2, seed3, seed4, seed5] = mojo_ser_data.get_seed_slices();
+
     // checks
     // check that maker is a signer ✅
     assert!(creator.is_signer(), "Creator should be a signer");
     // check that account_to_create is empty
-    assert!(account_to_create.data_is_empty(), "Account should be empty");
-    // // check that owner of account_to_create is this program
-    // assert_eq!(
-    //     account_to_create.owner(),
-    //     &crate::ID,
-    //     "Illegal Account Owner"
-    // );
+    assert!(
+        &account_to_create.data_is_empty(),
+        "Account should be empty"
+    );
+    // check that owner of account_to_create is this program
 
-    // create_account
-    let seeds_size = *mojo_ser_data.seeds_size.first().unwrap() as usize;
+    // NOTE Always use all 5 seeds
+    let (account_pda, bump) =
+        pubkey::find_program_address(&[seed1, seed2, seed3, seed4, seed5], &crate::ID);
 
-    log!("seed size {}", seeds_size);
-    // log!()
-    let seeds_first_slice = &mojo_ser_data.seeds[0..10]; // need to know this size in advance
-    let seeds_second_slice = &mojo_ser_data.seeds[10..seeds_size]; // need to know how many seed terms are there to separate
+    let seed_bump = [bump];
+    let seeds = seeds!(seed1, seed2, seed3, seed4, seed5, &seed_bump);
+    let signer = Signer::from(&seeds);
 
-    log!("both seeds {}, {}", seeds_first_slice, seeds_second_slice);
-
-    // let seeds = seeds!(seeds_first_slice, seeds_second_slice);
-
-    let seeds = &[seeds_first_slice, seeds_second_slice];
-
-    let (derived_pda, bump) = pubkey::find_program_address(seeds, &crate::id());
-
-    let bump_binding = [bump];
-
-    // create fundraiser
-    let signer_seeds = [
-        Seed::from(seeds_first_slice),
-        Seed::from(seeds_second_slice),
-        Seed::from(&bump_binding),
-    ];
-
-    // let seeds = seeds!(&mojo_ser_data.seeds[1..seeds_size]);
-    // let signer = Signer::from(&seeds);
-    let signers: [Signer<'_, '_>; 1] = [Signer::from(&signer_seeds[..])];
+    assert_eq!(
+        &account_pda,
+        account_to_create.key(),
+        "You provided the wrong user pda"
+    );
 
     CreateAccount {
         from: creator,

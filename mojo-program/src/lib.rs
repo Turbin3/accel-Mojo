@@ -10,6 +10,8 @@ mod tests;
 entrypoint!(process_instruction);
 pinocchio_pubkey::declare_id!("3jyHnrGq1z9YiGyx5QEUDR5hnZ7PYeYW5stFUq2skYZz");
 
+use pinocchio_log::log;
+
 pub fn process_instruction(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
