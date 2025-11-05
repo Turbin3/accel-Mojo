@@ -110,20 +110,27 @@ mod tests {
         let system_program = state.system_program;
 
         let my_state_data = MyPosition { x: 24, y: 12 };
-        // TODO error here
 
-        let mut combined = [0u8; 96];
-        combined[..10].copy_from_slice(b"fundraiser".as_ref());
-        combined[10..42].copy_from_slice(creator.pubkey().as_ref());
-        combined[42..].fill(0);
+        // let user_seeds = [
+        //     b"".as_ref(),
+        //     b"fundrais".as_ref(),
+        //     creator.pubkey().as_ref(),
+        //     b"".as_ref(),
+        //     b"".as_ref(),
+        // ]
+        // .concat();
 
-        log!("seed passed {}", &combined);
+        // all of these would be handled on the sdk
 
-        let mojo_data = crate::state::GenIxHandler {
-            seeds: combined,
-            seeds_size: 42u64.to_le_bytes(),
-            size: my_state_data.length().to_le_bytes(),
-        };
+        let mut mojo_data = GenIxHandler::new(my_state_data.length().to_le_bytes());
+        // Seeds start as all zeros, just fill what you need
+        let fundraiser_slice = b"fundrais"; // 8 bytes exactly
+        mojo_data
+            .fill_second(fundraiser_slice.try_into().unwrap())
+            .fill_third(creator.pubkey().as_ref().try_into().unwrap());
+
+        // const MAX_LEN: usize = 128;
+
         let create_ix_data = [
             vec![crate::instructions::MojoInstructions::CreateAccount as u8],
             mojo_data.to_bytes(),
