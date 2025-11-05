@@ -1,6 +1,6 @@
 use ephemeral_rollups_pinocchio::{
     consts::{BUFFER, MAGIC_CONTEXT_ID, MAGIC_PROGRAM_ID},
-    instruction::commit_and_undelegate,
+    instruction::{commit_and_undelegate, undelegate},
 };
 use pinocchio::{
     account_info::AccountInfo,
@@ -58,10 +58,11 @@ pub fn process_undelegate_account(
 
     ephemeral_rollups_pinocchio::instruction::commit_and_undelegate_accounts(
         creator,
-        accounts_to_commit, // Some pretty issues here.
+        &accounts[1..2], // Some pretty issues here.
         magic_context,
         magic_program,
     ).map_err(|_| ProgramError::InvalidAccountData)?;
 
+    undelegate()
     Ok(())
 }
