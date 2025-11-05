@@ -37,7 +37,7 @@ pub fn create_state_account(accounts: &[AccountInfo], data: &[u8]) -> ProgramRes
 
     let seed_bump = [bump];
     let seeds = seeds!(seed1, seed2, seed3, seed4, seed5, &seed_bump);
-    let signer = Signer::from(&seeds);
+    let signers = [Signer::from(&seeds)];
 
     assert_eq!(
         &account_pda,

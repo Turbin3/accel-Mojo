@@ -9,7 +9,7 @@ use crate::state::GenIxHandler;
 
 pub fn process_commit_instruction(
     accounts: &[AccountInfo],
-    _instruction_data: &[u8],
+    instruction_data: &[u8],
 ) -> ProgramResult {
     // need to discuss , how to handle magic context and magic program
     let [creator, creator_account, magic_context, magic_program, _system_program] = accounts else {
@@ -36,33 +36,19 @@ pub fn process_commit_instruction(
         return Err(ProgramError::InvalidAccountData);
     }
 
-    // reading and validating GenIxHandler from creator_account
-    let mojo_bytes = creator_account.try_borrow_data()?;
-    if mojo_bytes.len() < GenIxHandler::LEN {
-        return Err(ProgramError::InvalidAccountData);
+    // parse GenIxHandler from instruction data
+    if instruction_data.len() < GenIxHandler::LEN {
+        return Err(ProgramError::InvalidInstructionData);
     }
+    let mojo_data = &instruction_data[0..GenIxHandler::LEN];
+    let mojo_ser_data = bytemuck::try_pod_read_unaligned::<GenIxHandler>(mojo_data)
+        .map_err(|_| ProgramError::InvalidInstructionData)?;
 
-    let mojo_ser_data: &GenIxHandler = bytemuck::try_from_bytes(&mojo_bytes[..GenIxHandler::LEN])
-        .map_err(|_| ProgramError::InvalidAccountData)?;
+    let [seed1, seed2, seed3, seed4, seed5] = mojo_ser_data.get_seed_slices();
 
-    // Extract seeds_size properly (u64 from little-endian bytes)
-    let seeds_size = u64::from_le_bytes(mojo_ser_data.seeds_size) as usize;
-    if seeds_size > 96 || seeds_size == 0 {
-        return Err(ProgramError::InvalidArgument);
-    }
-
-    // Split seeds into two parts
-    // First 10 bytes is the first seed term, then 10..seeds_size is the second seed term
-    if seeds_size < 10 {
-        return Err(ProgramError::InvalidArgument);
-    }
-
-    let seeds_first_slice = &mojo_ser_data.seeds[0..10];
-    let seeds_second_slice = &mojo_ser_data.seeds[10..seeds_size];
-
-    // Derive PDA to verify it matches creator_account
-    let seeds = &[seeds_first_slice, seeds_second_slice];
-    let (derived_pda, _bump) = pubkey::find_program_address(seeds, &crate::ID);
+    // Derive PDA using all five seeds and verify it matches creator_account
+    let (derived_pda, _bump) =
+        pubkey::find_program_address(&[seed1, seed2, seed3, seed4, seed5], &crate::ID);
 
     if creator_account.key() != &derived_pda {
         return Err(ProgramError::InvalidSeeds);
@@ -71,7 +57,6 @@ pub fn process_commit_instruction(
     // comitting the updates
     commit_accounts(
         creator,
-        // [creator_account],
         &accounts[1..2], // expects creator_account as &[AccountInfo]
         magic_context,
         magic_program,
