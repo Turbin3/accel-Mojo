@@ -23,7 +23,7 @@ pub fn create_state_account(accounts: &[AccountInfo], data: &[u8]) -> ProgramRes
 
     // checks
     // check that maker is a signer ✅
-    assert!(&creator.is_signer(), "Creator should be a signer");
+    assert!(creator.is_signer(), "Creator should be a signer");
     // check that account_to_create is empty
     assert!(
         &account_to_create.data_is_empty(),
@@ -50,13 +50,13 @@ pub fn create_state_account(accounts: &[AccountInfo], data: &[u8]) -> ProgramRes
         lamports: Rent::get()?.minimum_balance(usize::from_le_bytes(mojo_ser_data.size)),
         owner: &crate::ID,
         space: u64::from_le_bytes(mojo_ser_data.size),
-        to: &*account_to_create,
+        to: account_to_create,
     }
-    .invoke_signed(&[signer])?;
+    .invoke_signed(&signers)?;
 
     let mut some_fist_account = account_to_create.try_borrow_mut_data().unwrap();
 
-    // this will modify the account state
+    // // this will modify the account state
     some_fist_account.copy_from_slice(&data[GenIxHandler::LEN..]);
     Ok(())
 }
