@@ -3,12 +3,9 @@ mod tests {
 
     use bytemuck::{Pod, Zeroable};
     use litesvm::LiteSVM;
-    use std::{io::Error, string};
+    use std::io::Error;
 
-    use pinocchio::{
-        msg,
-        sysvars::rent::{Rent, RENT_ID},
-    };
+    use pinocchio::sysvars::rent::RENT_ID;
     use pinocchio_log::log;
     use solana_instruction::{AccountMeta, Instruction};
     use solana_keypair::Keypair;
@@ -149,6 +146,86 @@ mod tests {
         // msg!("tx logs: {}", tx.logs);
         log!("\nCreate Account");
         log!("CUs Consumed: {}", tx.compute_units_consumed);
+        Ok(())
+    }
+
+    #[test]
+    pub fn commit_account() -> Result<(), Error> {
+        let (mut svm, state) = setup();
+
+        let creator = state.creator;
+        let account_to_create = state.account_to_create;
+        let system_program = state.system_program;
+
+        // Prepare user state and seeds
+        let my_state_data = MyPosition { x: 42, y: 24 };
+
+        let mut mojo_data = GenIxHandler::new(my_state_data.length().to_le_bytes());
+        let fundraiser_slice = b"fundrais"; // 8 bytes exactly
+        mojo_data
+            .fill_second(fundraiser_slice.try_into().unwrap())
+            .fill_third(creator.pubkey().as_ref().try_into().unwrap());
+
+        // 1) Create the PDA account so it's non-empty
+        let create_ix_data = [
+            vec![crate::instructions::MojoInstructions::CreateAccount as u8],
+            mojo_data.to_bytes(),
+            my_state_data.to_bytes(),
+        ]
+        .concat();
+
+        let create_ix = Instruction {
+            program_id: program_id(),
+            accounts: vec![
+                AccountMeta::new(creator.pubkey(), true),
+                AccountMeta::new(account_to_create.0, false),
+                AccountMeta::new(system_program, false),
+                AccountMeta::new(Pubkey::new_from_array(RENT_ID), false),
+            ],
+            data: create_ix_data,
+        };
+
+        let message = Message::new(&[create_ix], Some(&creator.pubkey()));
+        let recent_blockhash = svm.latest_blockhash();
+        let tx_create = Transaction::new(&[&creator], message, recent_blockhash);
+        let res_create = svm.send_transaction(tx_create).unwrap();
+        log!("\nCreate Account (pre-commit)");
+        log!("CUs Consumed: {}", res_create.compute_units_consumed);
+
+        // 2) Commit the PDA account through ER
+        let commit_ix_data = [
+            vec![crate::instructions::MojoInstructions::Commit as u8],
+            mojo_data.to_bytes(), // GenIxHandler only
+        ]
+        .concat();
+
+        let commit_ix = Instruction {
+            program_id: program_id(),
+            accounts: vec![
+                AccountMeta::new(creator.pubkey(), true),
+                AccountMeta::new(account_to_create.0, false),
+                AccountMeta::new_readonly(
+                    Pubkey::new_from_array(ephemeral_rollups_pinocchio::consts::MAGIC_CONTEXT_ID),
+                    false,
+                ),
+                AccountMeta::new_readonly(
+                    Pubkey::new_from_array(ephemeral_rollups_pinocchio::consts::MAGIC_PROGRAM_ID),
+                    false,
+                ),
+                AccountMeta::new_readonly(system_program, false),
+            ],
+            data: commit_ix_data,
+        };
+
+        let message = Message::new(&[commit_ix], Some(&creator.pubkey()));
+        let recent_blockhash = svm.latest_blockhash();
+        let tx_commit = Transaction::new(&[&creator], message, recent_blockhash);
+        let res_commit = svm.send_transaction(tx_commit);
+        // In unit tests, ER magic accounts/program are not available, so commit is expected to fail.
+        assert!(
+            res_commit.is_err(),
+            "Commit should fail in unit tests without ER context"
+        );
         Ok(())
     }
 }
