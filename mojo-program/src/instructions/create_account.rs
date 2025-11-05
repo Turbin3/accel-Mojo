@@ -52,7 +52,7 @@ pub fn create_state_account(accounts: &[AccountInfo], data: &[u8]) -> ProgramRes
         space: u64::from_le_bytes(mojo_ser_data.size),
         to: account_to_create,
     }
-    .invoke_signed(&signers)?;
+    .invoke_signed(&[signer])?;
 
     let mut some_fist_account = account_to_create.try_borrow_mut_data().unwrap();
 
