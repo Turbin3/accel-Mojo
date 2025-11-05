@@ -35,10 +35,16 @@ pub fn create_state_account(accounts: &[AccountInfo], data: &[u8]) -> ProgramRes
     // create_account
     let seeds_data = &mojo_ser_data.seeds; // need to know this size in advance
 
-    log!("digest seeds {}", seeds_data);
+    // log!("digest seeds {}", seeds_data);
 
     let seeds = &[seeds_data, creator.key().as_ref()];
     let (derived_pda, bump) = pubkey::find_program_address(seeds, &crate::id());
+
+    assert_eq!(
+        &derived_pda,
+        account_to_create.key(),
+        "You provided the wrong user pda"
+    );
     let bump_binding = [bump];
 
     // create fundraiser
