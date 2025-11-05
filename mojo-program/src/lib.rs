@@ -28,10 +28,10 @@ pub fn process_instruction(
             instructions::create_state_account(accounts, data)?;
         }
         MojoInstructions::DelegateAccount => {
-            instructions::process_delegate_account(accounts, instruction_data)?;
+            instructions::process_delegate_account(accounts, data)?;
         }
         MojoInstructions::UndelegateAccount => {
-            instructions::process_undelegate_account(accounts, instruction_data)?;
+            instructions::process_undelegate_account(accounts, data)?;
         }
         _ => return Err(pinocchio::program_error::ProgramError::InvalidInstructionData),
     }

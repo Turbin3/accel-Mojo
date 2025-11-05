@@ -17,7 +17,7 @@ pub fn create_state_account(accounts: &[AccountInfo], data: &[u8]) -> ProgramRes
     };
 
     let mojo_data = &data[0..GenIxHandler::LEN];
-    let mojo_ser_data = bytemuck::try_pod_read_unaligned::<GenIxHandler>(mojo_data).unwrap();
+    let mojo_ser_data = bytemuck::from_bytes::<GenIxHandler>(mojo_data);
 
     let [seed1, seed2, seed3, seed4, seed5] = mojo_ser_data.get_seed_slices();
 

@@ -12,7 +12,6 @@ use pinocchio::{
 
 use crate::state::GenIxHandler;
 
-use ephemeral_rollups_pinocchio::instruction::undelegate::undelegate;
 
 pub fn process_undelegate_account(
     accounts: &[AccountInfo],
@@ -63,6 +62,6 @@ pub fn process_undelegate_account(
         magic_program,
     ).map_err(|_| ProgramError::InvalidAccountData)?;
 
-    undelegate()
+    // undelegate()
     Ok(())
 }
