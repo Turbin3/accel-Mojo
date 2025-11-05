@@ -24,7 +24,7 @@ pub fn process_delegate_account (
     
     let [
         creator,
-        mojo_account_pda,
+        creator_account,
         owner_program,
         buffer_account,
         delegation_record,
@@ -37,7 +37,7 @@ pub fn process_delegate_account (
 
 
     // 0xAbim: Size validation
-    let mojo_bytes = mojo_account_pda.try_borrow_data()?;
+    let mojo_bytes = creator_account.try_borrow_data()?;
     if mojo_bytes.len() < GenIxHandler::LEN {
         return Err(ProgramError::InvalidAccountData);
     }
@@ -58,7 +58,7 @@ pub fn process_delegate_account (
 
     // 0xAbim: Verify PDA derivation after seeds are extracted
     let (derived_pda, bump) = find_program_address(&[seeds_slice], &crate::ID);
-    if mojo_account_pda.key() != &derived_pda {
+    if creator_account.key() != &derived_pda {
         return Err(ProgramError::InvalidSeeds);
     }
 
@@ -67,8 +67,8 @@ pub fn process_delegate_account (
     CreateAccount{
         from: creator,
         to: buffer_account,
-        lamports: rent_sysvar.minimum_balance(mojo_account_pda.data_len()),
-        space: mojo_account_pda.data_len() as u64,
+        lamports: rent_sysvar.minimum_balance(creator_account.data_len()),
+        space: creator_account.data_len() as u64,
         owner: &crate::ID,
     }.invoke()?; 
 
@@ -77,7 +77,7 @@ pub fn process_delegate_account (
     let pda_seeds: &[&[u8]] = &[seeds_slice];
     let delegation_accounts: &[&AccountInfo] = &[
         creator,
-        mojo_account_pda,
+        creator_account,
         owner_program,
         buffer_account,
         delegation_record,

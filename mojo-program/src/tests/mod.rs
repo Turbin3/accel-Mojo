@@ -2,6 +2,7 @@
 mod tests {
 
     use bytemuck::{Pod, Zeroable};
+    use ephemeral_rollups_pinocchio::{consts::MAGIC_CONTEXT_ID, pda::delegation_record_pda_from_delegated_account};
     use litesvm::LiteSVM;
     use std::{io::Error, string};
 
@@ -18,11 +19,14 @@ mod tests {
     use solana_signer::Signer;
     use solana_transaction::Transaction;
 
+    use crate::instructions::delegate_account;
+
     // use crate::instructions::MojoInstructions::CreateAccount;
 
     const PROGRAM_ID: Pubkey = Pubkey::new_from_array(crate::ID);
     const LOCAL_ER: &str = "mAGicPQYBMvcYveUZA5F5UNNwyHvfYh5xkLS2Fr1mev";
-    Pubkey
+    // const magic_context: [u8; 32] = MAGIC_CONTEXT_ID;
+    // Pubkey;
 
     fn program_id() -> Pubkey {
         PROGRAM_ID
@@ -63,6 +67,9 @@ mod tests {
             &PROGRAM_ID,
         );
 
+        let delegate_record = delegation_record_pda_from_delegated_account(delegate_accounts);
+
+
         let pda = String::from(account_to_create.0.to_string());
         log!("{}", &*pda);
 
@@ -74,6 +81,10 @@ mod tests {
             creator: payer,
             account_to_create2: None,
             creator_2: None,
+            mojo_account_pda: delegation,
+            buffer_account,
+            delegation_record,
+            delegation_metadata
         };
         (svm, reusable_state)
     }
@@ -84,6 +95,10 @@ mod tests {
         pub creator: Keypair,
         pub creator_2: Option<Keypair>,
         pub account_to_create2: Option<(Pubkey, u8)>,
+        pub mojo_account_pda: Pubkey,
+        pub buffer_account: Pubkey,
+        pub delegation_record: Pubkey,
+        pub delegation_metadata: Pubkey
     }
 
     #[test]
@@ -139,4 +154,20 @@ mod tests {
         log!("CUs Consumed: {}", tx.compute_units_consumed);
         Ok(())
     }
+
+    #[test]
+
+    pub fn delegate_account() -> Result<(), Error> {
+        let 
+    }
 }
+
+
+    // 0xAbim: Here goes the accounts to be delegated.
+    // 0. [] The creator acts as the payer 
+    // 1. [] the account pda (is_writable)
+    // 2. [] the owner' program 
+    // 3. [] the buffer account
+    // 4. [] the delegation record
+    // 5. [] the delegation metadata
+    // 6. [] System Program + ...Other essential accounts...

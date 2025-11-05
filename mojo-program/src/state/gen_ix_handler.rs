@@ -60,20 +60,20 @@ impl GenIxHandler {
     // next function to get all seeds and zero out the unassigned spaces
 }
 
-#[repr(C)]
-#[derive(Debug, BorshSerialize, BorshDeserialize)]
-pub struct DelegateAccountArgs {
-    pub commit_frequency_ms: u32,
-    pub seeds: Vec<Vec<u8>>,
-    pub validator: Option<Pubkey>,
-}
+// #[repr(C)]
+// #[derive(Debug, BorshSerialize, BorshDeserialize)]
+// pub struct DelegateAccountArgs {
+//     pub commit_frequency_ms: u32,
+//     pub seeds: Vec<Vec<u8>>,
+//     pub validator: Option<Pubkey>,
+// }
 
-impl Default for DelegateAccountArgs {
-    fn default() -> Self {
-        DelegateAccountArgs {
-            commit_frequency_ms: u32::MAX,
-            seeds: vec![],
-            validator: None,
-        }
-    }
-}
+// impl Default for DelegateAccountArgs {
+//     fn default() -> Self {
+//         DelegateAccountArgs {
+//             commit_frequency_ms: u32::MAX,
+//             seeds: vec![],
+//             validator: None,
+//         }
+//     }
+// }

@@ -61,7 +61,7 @@ pub fn process_undelegate_account(
         accounts_to_commit, // Some pretty issues here.
         magic_context,
         magic_program,
-    )?;
+    ).map_err(|_| ProgramError::InvalidAccountData)?;
 
     Ok(())
 }
