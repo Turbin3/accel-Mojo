@@ -3,8 +3,11 @@ use pinocchio::{account_info::AccountInfo, entrypoint, pubkey::Pubkey, ProgramRe
 use crate::instructions::MojoInstructions;
 
 mod instructions;
-mod state;
+pub mod state;
 mod tests;
+
+pub mod errors;
+pub use errors::*;
 
 entrypoint!(process_instruction);
 pinocchio_pubkey::declare_id!("3jyHnrGq1z9YiGyx5QEUDR5hnZ7PYeYW5stFUq2skYZz");
