@@ -1,13 +1,7 @@
-use ephemeral_rollups_pinocchio::{
-    consts::{BUFFER, MAGIC_CONTEXT_ID, MAGIC_PROGRAM_ID},
-    instruction::{commit_and_undelegate, undelegate},
-};
 use pinocchio::{
     account_info::AccountInfo,
-    instruction::{Seed, Signer},
     program_error::ProgramError,
-    pubkey::find_program_address,
-    seeds, ProgramResult,
+    pubkey::find_program_address, ProgramResult,
 };
 
 use crate::state::GenIxHandler;
