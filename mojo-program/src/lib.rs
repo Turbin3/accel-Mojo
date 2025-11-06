@@ -1,7 +1,9 @@
+#![allow(unexpected_cfgs)]
 use pinocchio::{account_info::AccountInfo, entrypoint, pubkey::Pubkey, ProgramResult};
 
 use crate::instructions::MojoInstructions;
 
+mod constants;
 mod instructions;
 mod state;
 mod tests;
@@ -9,7 +11,6 @@ mod tests;
 entrypoint!(process_instruction);
 pinocchio_pubkey::declare_id!("3jyHnrGq1z9YiGyx5QEUDR5hnZ7PYeYW5stFUq2skYZz");
 
-use pinocchio_log::log;
 
 pub fn process_instruction(
     program_id: &Pubkey,
@@ -26,11 +27,18 @@ pub fn process_instruction(
         MojoInstructions::CreateAccount => {
             instructions::create_state_account(accounts, data)?;
         }
-        // MojoInstructions::CreateAccount => {}
-        // MojoInstructions::DelegagteAccount => {}
-        // MojoInstructions::Commit => {}
-        // MojoInstructions::UpdateDelegatedAccount => (),
-        // MojoInstructions::UnDelegateAccount => (),
+        MojoInstructions::DelegateAccount => {
+            instructions::process_delegate_account(accounts, data)?;
+        }
+        MojoInstructions::UndelegateAccount => {
+            instructions::process_undelegate_account(accounts, data)?;
+        }
+        MojoInstructions::UpdateDelegatedAccount => {
+            instructions::update_delegated_account(accounts, data)?;
+        }
+        MojoInstructions::Commit => {
+            instructions::process_commit_instruction(accounts, data)?;
+        }
         _ => return Err(pinocchio::program_error::ProgramError::InvalidInstructionData),
     }
     Ok(())
