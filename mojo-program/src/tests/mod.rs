@@ -2,12 +2,20 @@
 mod tests {
 
     use bytemuck::{Pod, Zeroable};
-    use ephemeral_rollups_pinocchio::{consts::{BUFFER, DELEGATION_PROGRAM_ID, DELEGATION_RECORD, MAGIC_CONTEXT_ID}, pda::{delegation_record_pda_from_delegated_account, delegation_metadata_pda_from_delegated_account}};
+    use ephemeral_rollups_pinocchio::{
+        consts::{BUFFER, DELEGATION_PROGRAM_ID, DELEGATION_RECORD, MAGIC_CONTEXT_ID},
+        pda::{
+            delegation_metadata_pda_from_delegated_account,
+            delegation_record_pda_from_delegated_account,
+        },
+    };
     use litesvm::LiteSVM;
     use std::{io::Error, string};
 
     use pinocchio::{
-        msg, pubkey::find_program_address, sysvars::rent::{RENT_ID, Rent}
+        msg,
+        pubkey::find_program_address,
+        sysvars::rent::{Rent, RENT_ID},
     };
     use pinocchio_log::log;
     use solana_instruction::{AccountMeta, Instruction};
@@ -64,7 +72,13 @@ mod tests {
         // NOTE: Using empty first seed, "fundrais" (8 bytes) as second, and pubkey as third
         // to match the GenIxHandler seed layout
         let account_to_create = Pubkey::find_program_address(
-            &[&[0u8; 8], b"fundrais", payer.pubkey().as_ref(), &[0u8; 32], &[0u8; 32]],
+            &[
+                &[0u8; 8],
+                b"fundrais",
+                payer.pubkey().as_ref(),
+                &[0u8; 32],
+                &[0u8; 32],
+            ],
             &PROGRAM_ID,
         );
 
@@ -82,17 +96,22 @@ mod tests {
         // pinocchio's find_program_address only works on-chain. We need to derive manually.
         let delegation_program_id = Pubkey::new_from_array(DELEGATION_PROGRAM_ID);
 
+        svm.add_program_from_file(delegation_program_id, "delegate.so")
+            .unwrap();
+
         // Derive delegation_record PDA: ["delegation", account_pubkey]
         let delegation_record = Pubkey::find_program_address(
             &[b"delegation", account_to_create.0.as_ref()],
-            &delegation_program_id
-        ).0;
+            &delegation_program_id,
+        )
+        .0;
 
         // Derive delegation_metadata PDA: ["delegation-metadata", account_pubkey]
         let delegation_metadata = Pubkey::find_program_address(
             &[b"delegation-metadata", account_to_create.0.as_ref()],
-            &delegation_program_id
-        ).0;
+            &delegation_program_id,
+        )
+        .0;
 
         let reusable_state = ReusableState {
             system_program,
@@ -105,7 +124,6 @@ mod tests {
             buffer_account: buffer_keypair.pubkey(),
             delegation_metadata,
             delegation_record,
-
         };
         (svm, reusable_state)
     }
@@ -120,7 +138,7 @@ mod tests {
         pub owner_program: Pubkey,
         pub buffer_account: Pubkey,
         pub delegation_record: Pubkey,
-        pub delegation_metadata: Pubkey
+        pub delegation_metadata: Pubkey,
     }
 
     #[test]
@@ -187,10 +205,8 @@ mod tests {
         let system_program = state.system_program;
 
         // Derive the buffer PDA using [BUFFER, creator_account] with our PROGRAM_ID
-        let buffer_account = Pubkey::find_program_address(
-            &[BUFFER, creator_account.0.as_ref()],
-            &PROGRAM_ID
-        ).0;
+        let buffer_account =
+            Pubkey::find_program_address(&[BUFFER, creator_account.0.as_ref()], &PROGRAM_ID).0;
 
         // First create the account with proper structure before delegating it
         let my_state_data = MyPosition { x: 24, y: 12 };
@@ -231,18 +247,22 @@ mod tests {
         let delegate_ix_data = [
             vec![crate::instructions::MojoInstructions::DelegateAccount as u8],
             mojo_data.to_bytes(),
-        ].concat();
+        ]
+        .concat();
+
+        let delegation_program_id = Pubkey::new_from_array(DELEGATION_PROGRAM_ID);
 
         let delegate_ix = Instruction {
             program_id: program_id(),
             accounts: vec![
-                AccountMeta::new(creator.pubkey(), true),            // creator/payer
-                AccountMeta::new(creator_account.0, false),          // account to delegate
-                AccountMeta::new(owner_program, false),              // owner program
-                AccountMeta::new(buffer_account, false),             // buffer PDA (created via invoke_signed)
-                AccountMeta::new(delegation_record, false),          // delegation record
-                AccountMeta::new(delegation_metadata, false),        // delegation metadata
-                AccountMeta::new(system_program, false),             // system program
+                AccountMeta::new(creator.pubkey(), true),   // creator/payer
+                AccountMeta::new(creator_account.0, false), // account to delegate
+                AccountMeta::new(owner_program, false),     // owner program
+                AccountMeta::new(buffer_account, false), // buffer PDA (created via invoke_signed)
+                AccountMeta::new(delegation_record, false), // delegation record
+                AccountMeta::new(delegation_metadata, false), // delegation metadata
+                AccountMeta::new(system_program, false), // system program
+                AccountMeta::new(delegation_program_id, false), // system program
             ],
             data: delegate_ix_data,
         };
