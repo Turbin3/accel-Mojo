@@ -279,4 +279,137 @@ mod tests {
         log!("CUs Consumed: {}", tx.compute_units_consumed);
         Ok(())
     }
+
+    #[test]
+    pub fn update_account() -> Result<(), Error> {
+        let (mut svm, state) = setup();
+
+        let creator = state.creator;
+        let creator_account = state.account_to_create;
+        let owner_program = state.owner_program;
+        let delegation_record = state.delegation_record;
+        let delegation_metadata = state.delegation_metadata;
+        let system_program = state.system_program;
+
+        // Derive the buffer PDA using [BUFFER, creator_account] with our PROGRAM_ID
+        let buffer_account =
+            Pubkey::find_program_address(&[BUFFER, creator_account.0.as_ref()], &PROGRAM_ID).0;
+
+        // First create the account with proper structure before delegating it
+        let my_state_data = MyPosition { x: 24, y: 12 };
+
+        // Note: GenIxHandler.size should be the account data size (MyPosition), not total instruction size
+        let account_size = my_state_data.length() as u64;
+        let mut mojo_data = GenIxHandler::new(account_size.to_le_bytes());
+        let fundraiser_slice = b"fundrais";
+        mojo_data
+            .fill_second(fundraiser_slice.try_into().unwrap())
+            .fill_third(creator.pubkey().as_ref().try_into().unwrap());
+
+        let create_ix_data = [
+            vec![crate::instructions::MojoInstructions::CreateAccount as u8],
+            mojo_data.to_bytes(),
+            my_state_data.to_bytes(),
+        ]
+        .concat();
+
+        let create_ix = Instruction {
+            program_id: program_id(),
+            accounts: vec![
+                AccountMeta::new(creator.pubkey(), true),
+                AccountMeta::new(creator_account.0, false),
+                AccountMeta::new(system_program, false),
+                AccountMeta::new(Pubkey::new_from_array(RENT_ID), false),
+            ],
+            data: create_ix_data,
+        };
+
+        log!("creator address {}", &creator.pubkey().to_bytes());
+
+        let message = Message::new(&[create_ix], Some(&creator.pubkey()));
+        let recent_blockhash = svm.latest_blockhash();
+        let transaction = Transaction::new(&[&creator], message, recent_blockhash);
+        svm.send_transaction(transaction).unwrap();
+
+        // Now delegate the account
+        // Need to pass GenIxHandler in instruction data for seed derivation
+        let delegate_ix_data = [
+            vec![crate::instructions::MojoInstructions::DelegateAccount as u8],
+            mojo_data.to_bytes(),
+        ]
+        .concat();
+
+        let delegation_program_id = Pubkey::new_from_array(DELEGATION_PROGRAM_ID);
+
+        let delegate_ix = Instruction {
+            program_id: program_id(),
+            accounts: vec![
+                AccountMeta::new(creator.pubkey(), true),   // creator/payer
+                AccountMeta::new(creator_account.0, false), // account to delegate
+                AccountMeta::new(owner_program, false),     // owner program
+                AccountMeta::new(buffer_account, false), // buffer PDA (created via invoke_signed)
+                AccountMeta::new(delegation_record, false), // delegation record
+                AccountMeta::new(delegation_metadata, false), // delegation metadata
+                AccountMeta::new(system_program, false), // system program
+                AccountMeta::new(delegation_program_id, false), // system program
+            ],
+            data: delegate_ix_data,
+        };
+
+        let message = Message::new(&[delegate_ix], Some(&creator.pubkey()));
+        let recent_blockhash = svm.latest_blockhash();
+
+        // Only creator needs to sign
+        let transaction = Transaction::new(&[&creator], message, recent_blockhash);
+
+        // Send the transaction and capture the result
+        let tx2 = svm.send_transaction(transaction).unwrap();
+        log!("\nDelegate Account transaction successful");
+        log!("CUs Consumed: {}", tx2.compute_units_consumed);
+
+        // Now update the account
+
+        log!("delegate program {}", &delegation_program_id.to_bytes());
+
+        let my_update_state_data = MyPosition { x: 26, y: 14 };
+
+        // Need to pass GenIxHandler in instruction data for seed derivation
+        let update_ix_data = [
+            vec![crate::instructions::MojoInstructions::UpdateDelegatedAccount as u8],
+            mojo_data.to_bytes(),
+            my_update_state_data.to_bytes(),
+        ]
+        .concat();
+
+        let update_ix = Instruction {
+            program_id: program_id(),
+            accounts: vec![
+                AccountMeta::new(creator.pubkey(), true),
+                AccountMeta::new(creator_account.0, false),
+                AccountMeta::new(system_program, false),
+                AccountMeta::new(Pubkey::new_from_array(RENT_ID), false),
+                AccountMeta::new_readonly(
+                    Pubkey::new_from_array(ephemeral_rollups_pinocchio::consts::MAGIC_CONTEXT_ID),
+                    false,
+                ),
+                AccountMeta::new_readonly(
+                    Pubkey::new_from_array(ephemeral_rollups_pinocchio::consts::MAGIC_PROGRAM_ID),
+                    false,
+                ),
+            ],
+            data: update_ix_data,
+        };
+
+        let message = Message::new(&[update_ix], Some(&creator.pubkey()));
+        let recent_blockhash = svm.latest_blockhash();
+
+        // Only creator needs to sign
+        let transaction = Transaction::new(&[&creator], message, recent_blockhash);
+
+        // Send the transaction and capture the result
+        let tx3 = svm.send_transaction(transaction).unwrap();
+        log!("\nUpdate Account transaction successful");
+        log!("CUs Consumed: {}", tx3.compute_units_consumed);
+        Ok(())
+    }
 }
