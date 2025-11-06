@@ -87,7 +87,7 @@ impl TestEnv {
         Ok(())
     }
 
-    /// Send and confirm transaction on base layer
+    /// Send and confirm transaction on base layer with CU tracking
     pub fn send_and_confirm_base(
         &self,
         instruction: Instruction,
@@ -104,10 +104,14 @@ impl TestEnv {
         let signature = self
             .base_client
             .send_and_confirm_transaction(&transaction)?;
+
+        // Log compute units consumed
+        // self.log_compute_units(&signature, &self.base_client, "Base Layer");
+
         Ok(signature.to_string())
     }
 
-    /// Send and confirm transaction on ER
+    /// Send and confirm transaction on ER with CU tracking
     pub fn send_and_confirm_er(
         &self,
         instruction: Instruction,
@@ -122,8 +126,25 @@ impl TestEnv {
         );
 
         let signature = self.er_client.send_and_confirm_transaction(&transaction)?;
+
+        // Log compute units consumed
+        // self.log_compute_units(&signature, &self.er_client, "ER");
+
         Ok(signature.to_string())
     }
+
+    /// Helper to log compute units consumed
+    // fn log_compute_units(&self, signature: &solana_sdk::signature::Signature, client: &RpcClient, layer: &str) {
+    //     use solana_sdk::commitment_config::CommitmentConfig;
+
+    //     if let Ok(tx_response) = client.get_transaction(signature, CommitmentConfig::confirmed()) {
+    //         if let Some(meta) = tx_response.transaction.meta {
+    //             if let Some(cu) = meta.compute_units_consumed {
+    //                 println!("   [{}] Compute Units: {}", layer, cu);
+    //             }
+    //         }
+    //     }
+    // }
 
     /// Get account data from base layer
     pub fn get_account_base(

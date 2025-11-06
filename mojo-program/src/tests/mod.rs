@@ -15,6 +15,8 @@ mod tests {
     };
     use litesvm::LiteSVM;
     use std::io::Error;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::time::Instant;
 
     use pinocchio::{
         msg,
@@ -38,6 +40,9 @@ mod tests {
     const LOCAL_ER: &str = "mAGicPQYBMvcYveUZA5F5UNNwyHvfYh5xkLS2Fr1mev";
     // const magic_context: [u8; 32] = MAGIC_CONTEXT_ID;
     // Pubkey;
+
+    // Global counter for tracking total compute units across all tests
+    static TOTAL_CUS: AtomicU64 = AtomicU64::new(0);
 
     fn program_id() -> Pubkey {
         PROGRAM_ID
@@ -147,6 +152,7 @@ mod tests {
 
     #[test]
     pub fn create_account() -> Result<(), Error> {
+        let test_start = Instant::now();
         let (mut svm, mut state) = setup();
 
         let creator = state.creator;
@@ -190,15 +196,28 @@ mod tests {
         let transaction = Transaction::new(&[&creator], message, recent_blockhash);
 
         // Send the transaction and capture the result
+        let tx_start = Instant::now();
         let tx = svm.send_transaction(transaction).unwrap();
-        // msg!("tx logs: {:#?}", tx.logs);
-        log!("\nAdmin Claim transaction sucessful");
-        log!("CUs Consumed: {}", tx.compute_units_consumed);
+        let tx_duration = tx_start.elapsed();
+        let cus = tx.compute_units_consumed;
+
+        // Track CUs
+        TOTAL_CUS.fetch_add(cus, Ordering::SeqCst);
+
+        let test_duration = test_start.elapsed();
+
+        log!("\n=== create_account Test ===");
+        log!("Transaction successful");
+        log!("TX Time: {}ms", tx_duration.as_millis());
+        log!("CUs Consumed: {}", cus);
+        log!("Test Total Time: {}ms", test_duration.as_millis());
+        log!("Total CUs (all tests): {}", TOTAL_CUS.load(Ordering::SeqCst));
         Ok(())
     }
 
     #[test]
     pub fn delegate_account() -> Result<(), Error> {
+        let test_start = Instant::now();
         let (mut svm, state) = setup();
 
         let creator = state.creator;
@@ -244,7 +263,11 @@ mod tests {
         let message = Message::new(&[create_ix], Some(&creator.pubkey()));
         let recent_blockhash = svm.latest_blockhash();
         let transaction = Transaction::new(&[&creator], message, recent_blockhash);
-        svm.send_transaction(transaction).unwrap();
+        let tx_create_start = Instant::now();
+        let tx_create = svm.send_transaction(transaction).unwrap();
+        let tx_create_duration = tx_create_start.elapsed();
+        let cus_create = tx_create.compute_units_consumed;
+        TOTAL_CUS.fetch_add(cus_create, Ordering::SeqCst);
 
         // Now delegate the account
         // Need to pass GenIxHandler in instruction data for seed derivation
@@ -278,14 +301,27 @@ mod tests {
         let transaction = Transaction::new(&[&creator], message, recent_blockhash);
 
         // Send the transaction and capture the result
-        let tx = svm.send_transaction(transaction).unwrap();
-        log!("\nDelegate Account transaction successful");
-        log!("CUs Consumed: {}", tx.compute_units_consumed);
+        let tx_delegate_start = Instant::now();
+        let tx_delegate = svm.send_transaction(transaction).unwrap();
+        let tx_delegate_duration = tx_delegate_start.elapsed();
+        let cus_delegate = tx_delegate.compute_units_consumed;
+        TOTAL_CUS.fetch_add(cus_delegate, Ordering::SeqCst);
+
+        let test_duration = test_start.elapsed();
+        let test_total_cus = cus_create + cus_delegate;
+
+        log!("\n=== delegate_account Test ===");
+        log!("Create TX Time: {}ms, CUs: {}", tx_create_duration.as_millis(), cus_create);
+        log!("Delegate TX Time: {}ms, CUs: {}", tx_delegate_duration.as_millis(), cus_delegate);
+        log!("Test Total Time: {}ms", test_duration.as_millis());
+        log!("Test Total CUs: {}", test_total_cus);
+        log!("Total CUs (all tests): {}", TOTAL_CUS.load(Ordering::SeqCst));
         Ok(())
     }
 
     #[test]
     pub fn update_account() -> Result<(), Error> {
+        let test_start = Instant::now();
         let (mut svm, state) = setup();
 
         let creator = state.creator;
@@ -333,7 +369,11 @@ mod tests {
         let message = Message::new(&[create_ix], Some(&creator.pubkey()));
         let recent_blockhash = svm.latest_blockhash();
         let transaction = Transaction::new(&[&creator], message, recent_blockhash);
-        svm.send_transaction(transaction).unwrap();
+        let tx_create_start = Instant::now();
+        let tx_create = svm.send_transaction(transaction).unwrap();
+        let tx_create_duration = tx_create_start.elapsed();
+        let cus_create = tx_create.compute_units_consumed;
+        TOTAL_CUS.fetch_add(cus_create, Ordering::SeqCst);
 
         // Now delegate the account
         // Need to pass GenIxHandler in instruction data for seed derivation
@@ -367,9 +407,11 @@ mod tests {
         let transaction = Transaction::new(&[&creator], message, recent_blockhash);
 
         // Send the transaction and capture the result
-        let tx2 = svm.send_transaction(transaction).unwrap();
-        log!("\nDelegate Account transaction successful");
-        log!("CUs Consumed: {}", tx2.compute_units_consumed);
+        let tx_delegate_start = Instant::now();
+        let tx_delegate = svm.send_transaction(transaction).unwrap();
+        let tx_delegate_duration = tx_delegate_start.elapsed();
+        let cus_delegate = tx_delegate.compute_units_consumed;
+        TOTAL_CUS.fetch_add(cus_delegate, Ordering::SeqCst);
 
         // Now update the account
 
@@ -419,11 +461,22 @@ mod tests {
             res_update.is_err(),
             "Update delegated account should fail in unit tests without ER context"
         );
+
+        let test_duration = test_start.elapsed();
+        let test_total_cus = cus_create + cus_delegate;
+
+        log!("\n=== update_account Test ===");
+        log!("Create TX Time: {}ms, CUs: {}", tx_create_duration.as_millis(), cus_create);
+        log!("Delegate TX Time: {}ms, CUs: {}", tx_delegate_duration.as_millis(), cus_delegate);
+        log!("Test Total Time: {}ms", test_duration.as_millis());
+        log!("Test Total CUs: {}", test_total_cus);
+        log!("Total CUs (all tests): {}", TOTAL_CUS.load(Ordering::SeqCst));
         Ok(())
     }
 
     #[test]
     pub fn commit_account() -> Result<(), Error> {
+        let test_start = Instant::now();
         let (mut svm, state) = setup();
 
         let creator = state.creator;
@@ -461,9 +514,11 @@ mod tests {
         let message = Message::new(&[create_ix], Some(&creator.pubkey()));
         let recent_blockhash = svm.latest_blockhash();
         let tx_create = Transaction::new(&[&creator], message, recent_blockhash);
-        let res_create = svm.send_transaction(tx_create).unwrap();
-        log!("\nCreate Account (pre-commit)");
-        log!("CUs Consumed: {}", res_create.compute_units_consumed);
+        let tx_create_start = Instant::now();
+        let tx_create = svm.send_transaction(tx_create).unwrap();
+        let tx_create_duration = tx_create_start.elapsed();
+        let cus_create = tx_create.compute_units_consumed;
+        TOTAL_CUS.fetch_add(cus_create, Ordering::SeqCst);
 
         // 2) Commit the PDA account through ER
         let commit_ix_data = [
@@ -499,11 +554,21 @@ mod tests {
             res_commit.is_err(),
             "Commit should fail in unit tests without ER context"
         );
+
+        let test_duration = test_start.elapsed();
+        let test_total_cus = cus_create;
+
+        log!("\n=== commit_account Test ===");
+        log!("Create TX Time: {}ms, CUs: {}", tx_create_duration.as_millis(), cus_create);
+        log!("Test Total Time: {}ms", test_duration.as_millis());
+        log!("Test Total CUs: {}", test_total_cus);
+        log!("Total CUs (all tests): {}", TOTAL_CUS.load(Ordering::SeqCst));
         Ok(())
     }
 
     #[test]
     pub fn undelegate_account() -> Result<(), Error> {
+        let test_start = Instant::now();
         let (mut svm, state) = setup();
 
         let creator = state.creator;
@@ -548,7 +613,11 @@ mod tests {
         let message = Message::new(&[create_ix], Some(&creator.pubkey()));
         let recent_blockhash = svm.latest_blockhash();
         let transaction = Transaction::new(&[&creator], message, recent_blockhash);
-        svm.send_transaction(transaction).unwrap();
+        let tx_create_start = Instant::now();
+        let tx_create = svm.send_transaction(transaction).unwrap();
+        let tx_create_duration = tx_create_start.elapsed();
+        let cus_create = tx_create.compute_units_consumed;
+        TOTAL_CUS.fetch_add(cus_create, Ordering::SeqCst);
 
         // Delegate the account
         let delegate_ix_data = [
@@ -577,8 +646,11 @@ mod tests {
         let message = Message::new(&[delegate_ix], Some(&creator.pubkey()));
         let recent_blockhash = svm.latest_blockhash();
         let transaction = Transaction::new(&[&creator], message, recent_blockhash);
-        svm.send_transaction(transaction).unwrap();
-        log!("\nDelegate Account transaction successful");
+        let tx_delegate_start = Instant::now();
+        let tx_delegate = svm.send_transaction(transaction).unwrap();
+        let tx_delegate_duration = tx_delegate_start.elapsed();
+        let cus_delegate = tx_delegate.compute_units_consumed;
+        TOTAL_CUS.fetch_add(cus_delegate, Ordering::SeqCst);
 
         // Now undelegate the account
         let undelegate_ix_data = [
@@ -614,6 +686,16 @@ mod tests {
             res_undelegate.is_err(),
             "Undelegate should fail in unit tests without ER context"
         );
+
+        let test_duration = test_start.elapsed();
+        let test_total_cus = cus_create + cus_delegate;
+
+        log!("\n=== undelegate_account Test ===");
+        log!("Create TX Time: {}ms, CUs: {}", tx_create_duration.as_millis(), cus_create);
+        log!("Delegate TX Time: {}ms, CUs: {}", tx_delegate_duration.as_millis(), cus_delegate);
+        log!("Test Total Time: {}ms", test_duration.as_millis());
+        log!("Test Total CUs: {}", test_total_cus);
+        log!("Total CUs (all tests): {}", TOTAL_CUS.load(Ordering::SeqCst));
         Ok(())
     }
 }
