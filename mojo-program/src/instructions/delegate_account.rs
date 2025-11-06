@@ -15,6 +15,8 @@ use pinocchio::{
     sysvars::{rent::Rent, Sysvar},
     ProgramResult,
 };
+
+use pinocchio_log::log;
 use pinocchio_system::instructions::{Assign, CreateAccount};
 
 #[allow(clippy::cloned_ref_to_slice_refs)]
@@ -60,6 +62,10 @@ pub fn process_delegate_account(
     find_program_address(&seed_slice[0..5], &crate::ID);
     if creator_account.key() != &derived_pda {
         return Err(ProgramError::InvalidSeeds);
+    }
+
+    unsafe {
+        log!("owner of the account is {}", (creator_account.owner()));
     }
 
     // 0xAbim: Create signer seeds with bump - required for CPI signing

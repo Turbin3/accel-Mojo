@@ -1,6 +1,9 @@
 pub mod create_account;
 pub use create_account::*;
 
+pub mod update_account;
+pub use update_account::*;
+
 pub mod delegate_account;
 pub use delegate_account::*;
 

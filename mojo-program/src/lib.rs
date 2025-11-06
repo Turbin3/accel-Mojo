@@ -33,6 +33,9 @@ pub fn process_instruction(
         MojoInstructions::UndelegateAccount => {
             instructions::process_undelegate_account(accounts, data)?;
         }
+        MojoInstructions::UpdateDelegatedAccount => {
+            instructions::update_delegated_account(accounts, data)?;
+        }
         _ => return Err(pinocchio::program_error::ProgramError::InvalidInstructionData),
     }
     Ok(())
