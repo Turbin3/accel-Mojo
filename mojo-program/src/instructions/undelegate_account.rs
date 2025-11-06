@@ -12,7 +12,6 @@ use pinocchio::{
 
 use crate::state::GenIxHandler;
 
-
 pub fn process_undelegate_account(
     accounts: &[AccountInfo],
     instruction_data: &[u8],
@@ -60,7 +59,8 @@ pub fn process_undelegate_account(
         &accounts[1..2], // Some pretty issues here.
         magic_context,
         magic_program,
-    ).map_err(|_| ProgramError::InvalidAccountData)?;
+    )
+    .map_err(|_| ProgramError::InvalidAccountData)?;
 
     // undelegate()
     Ok(())
