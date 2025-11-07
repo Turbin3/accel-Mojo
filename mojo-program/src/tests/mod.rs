@@ -282,14 +282,14 @@ mod tests {
         let delegate_ix = Instruction {
             program_id: program_id(),
             accounts: vec![
-                AccountMeta::new(creator.pubkey(), true),   // creator/payer
-                AccountMeta::new(creator_account.0, false), // account to delegate
-                AccountMeta::new(owner_program, false),     // owner program
-                AccountMeta::new(buffer_account, false), // buffer PDA (created via invoke_signed)
-                AccountMeta::new(delegation_record, false), // delegation record
-                AccountMeta::new(delegation_metadata, false), // delegation metadata
-                AccountMeta::new(system_program, false), // system program
-                AccountMeta::new(delegation_program_id, false), // system program
+                AccountMeta::new(creator.pubkey(), true),   // 0. creator/payer
+                AccountMeta::new(system_program, false),     // 1. system program (must be native system program id)
+                AccountMeta::new(creator_account.0, false), // 2. creator account PDA (delegated account)
+                AccountMeta::new(owner_program, false),     // 3. owner program
+                AccountMeta::new(buffer_account, false),    // 4. buffer PDA (created via CPI)
+                AccountMeta::new(delegation_record, false), // 5. delegation record PDA
+                AccountMeta::new(delegation_metadata, false), // 6. delegation metadata PDA
+                AccountMeta::new(delegation_program_id, false), // 7. (optional) remaining accounts
             ],
             data: delegate_ix_data,
         };
@@ -388,14 +388,14 @@ mod tests {
         let delegate_ix = Instruction {
             program_id: program_id(),
             accounts: vec![
-                AccountMeta::new(creator.pubkey(), true),   // creator/payer
-                AccountMeta::new(creator_account.0, false), // account to delegate
-                AccountMeta::new(owner_program, false),     // owner program
-                AccountMeta::new(buffer_account, false), // buffer PDA (created via invoke_signed)
-                AccountMeta::new(delegation_record, false), // delegation record
-                AccountMeta::new(delegation_metadata, false), // delegation metadata
-                AccountMeta::new(system_program, false), // system program
-                AccountMeta::new(delegation_program_id, false), // system program
+                AccountMeta::new(creator.pubkey(), true),
+                AccountMeta::new(system_program, false),
+                AccountMeta::new(creator_account.0, false),
+                AccountMeta::new(owner_program, false),
+                AccountMeta::new(buffer_account, false),
+                AccountMeta::new(delegation_record, false),
+                AccountMeta::new(delegation_metadata, false),
+                AccountMeta::new(delegation_program_id, false),
             ],
             data: delegate_ix_data,
         };
@@ -632,13 +632,13 @@ mod tests {
             program_id: program_id(),
             accounts: vec![
                 AccountMeta::new(creator.pubkey(), true),
+                AccountMeta::new(system_program, false),
                 AccountMeta::new(creator_account.0, false),
                 AccountMeta::new(owner_program, false),
                 AccountMeta::new(buffer_account, false),
                 AccountMeta::new(delegation_record, false),
                 AccountMeta::new(delegation_metadata, false),
-                AccountMeta::new(system_program, false),
-                AccountMeta::new(delegation_program_id, false),
+                AccountMeta::new_readonly(delegation_program_id, false),
             ],
             data: delegate_ix_data,
         };

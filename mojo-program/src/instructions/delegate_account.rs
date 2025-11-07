@@ -30,12 +30,12 @@ pub fn process_delegate_account(
     // 7. []       (optional) remaining accounts
     let [
         creator,
+        system_program,
         creator_account,
         owner_program,
         buffer_account,
         delegation_record,
         delegation_metadata,
-        system_program,
         _rest @ ..
     ] = accounts
     else {
