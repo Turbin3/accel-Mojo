@@ -388,14 +388,14 @@ mod tests {
         let delegate_ix = Instruction {
             program_id: program_id(),
             accounts: vec![
-                AccountMeta::new(creator.pubkey(), true),
-                AccountMeta::new(system_program, false),
-                AccountMeta::new(creator_account.0, false),
-                AccountMeta::new(owner_program, false),
-                AccountMeta::new(buffer_account, false),
-                AccountMeta::new(delegation_record, false),
-                AccountMeta::new(delegation_metadata, false),
-                AccountMeta::new(delegation_program_id, false),
+                AccountMeta::new(creator.pubkey(), true),   // creator/payer
+                AccountMeta::new(system_program, false),     // system program (must be native system program id)
+                AccountMeta::new(creator_account.0, false), // creator account PDA (delegated account)
+                AccountMeta::new(owner_program, false),     // owner program
+                AccountMeta::new(buffer_account, false),    // buffer PDA (created via CPI)
+                AccountMeta::new(delegation_record, false), // delegation record PDA
+                AccountMeta::new(delegation_metadata, false), // delegation metadata PDA
+                AccountMeta::new(delegation_program_id, false), // (optional) remaining accounts
             ],
             data: delegate_ix_data,
         };
