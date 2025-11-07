@@ -20,7 +20,7 @@ impl MyPosition {
 }
 
 #[cfg(test)]
-mod tests {
+mod er_tests {
 
     pub const PROGRAM_ID: Pubkey = Pubkey::new_from_array(crate::ID);
     // pub const RPC_URL: &str = "http://127.0.0.1:8899";
@@ -44,7 +44,11 @@ mod tests {
     use solana_signer::Signer;
     use solana_transaction::Transaction;
     // use std::str::FromStr;
+    use crate::encode_packed;
+    use crate::tests::utils::helpers::*;
+    // use crate::
     use crate::state::GenIxHandler;
+    use pinocchio::{instruction::Signer as PSigner, seeds};
 
     use ephemeral_rollups_pinocchio::{
         consts::{BUFFER, DELEGATION_PROGRAM_ID, DELEGATION_RECORD, MAGIC_CONTEXT_ID},
@@ -75,16 +79,10 @@ mod tests {
 
         let payer = read_keypair_file("dev_wallet.json").expect("Couldn't find wallet file");
 
-        let program_id = Pubkey::new_from_array(crate::ID);
-
+        // Derive the PDA for the escrow account using the maker's public key and a seed value
+        let combined = encode_packed!(b"fundraise4", payer.pubkey().as_ref());
         let account_to_create = Pubkey::find_program_address(
-            &[
-                &[0u8; 8],
-                b"fundra43",
-                payer.pubkey().as_ref(),
-                &[0u8; 32],
-                &[0u8; 32],
-            ],
+            &[&compute_hash(&combined), payer.pubkey().as_ref()],
             &PROGRAM_ID,
         );
 
@@ -106,8 +104,6 @@ mod tests {
             &delegation_program_id,
         )
         .0;
-
-        // let buffer_keypair = Keypair::new();
 
         // Derive the buffer PDA using [BUFFER, creator_account] with our PROGRAM_ID
         let buffer_account =
@@ -131,7 +127,7 @@ mod tests {
         (reusable_state)
     }
 
-    #[ignore = "reason"]
+    #[test]
     fn test_create_state_account() {
         let mut state = setup();
 
@@ -141,16 +137,13 @@ mod tests {
 
         let my_state_data = MyPosition { x: 24, y: 12 };
 
-        // all of these would be handled on the sdk
-        let account_size = my_state_data.length() as u64;
-        let mut mojo_data = GenIxHandler::new(account_size.to_le_bytes());
-        // Seeds start as all zeros, just fill what you need
-        let fundraiser_slice = b"fundra43"; // 8 bytes exactly
-        mojo_data
-            .fill_second(fundraiser_slice.try_into().unwrap())
-            .fill_third(creator.pubkey().as_ref().try_into().unwrap());
+        let combined = encode_packed!(b"fundraise4", creator.pubkey().as_ref());
+        let digest = compute_hash(&combined);
 
-        // const MAX_LEN: usize = 128;
+        let mojo_data = crate::state::GenIxHandler {
+            seeds: digest,
+            size: my_state_data.length().to_le_bytes(),
+        };
 
         let create_ix_data = [
             vec![crate::instructions::MojoInstructions::CreateAccount as u8],
@@ -192,7 +185,7 @@ mod tests {
         );
     }
 
-    #[ignore]
+    #[test]
     fn test_delegate_state_account() {
         let mut state = setup();
 
@@ -209,14 +202,13 @@ mod tests {
 
         let my_state_data: MyPosition = MyPosition { x: 24, y: 12 };
 
-        // all of these would be handled on the sdk
-        let account_size = my_state_data.length() as u64;
-        let mut mojo_data = GenIxHandler::new(account_size.to_le_bytes());
-        // Seeds start as all zeros, just fill what you need
-        let fundraiser_slice = b"fundra43"; // 8 bytes exactly
-        mojo_data
-            .fill_second(fundraiser_slice.try_into().unwrap())
-            .fill_third(creator.pubkey().as_ref().try_into().unwrap());
+        let combined = encode_packed!(b"fundraise4", creator.pubkey().as_ref());
+        let digest = compute_hash(&combined);
+
+        let mojo_data = crate::state::GenIxHandler {
+            seeds: digest,
+            size: my_state_data.length().to_le_bytes(),
+        };
 
         // const MAX_LEN: usize = 128;
 
@@ -263,7 +255,7 @@ mod tests {
         );
     }
 
-    #[ignore = "reason"]
+    #[test]
     fn test_update_delegated_account() {
         let mut state = setup();
 
@@ -278,16 +270,15 @@ mod tests {
         let buffer_account =
             Pubkey::find_program_address(&[BUFFER, creator_account.0.as_ref()], &PROGRAM_ID).0;
 
-        let my_update_state_data: MyPosition = MyPosition { x: 26, y: 12 };
+        let my_update_state_data: MyPosition = MyPosition { x: 24, y: 12 };
 
-        // all of these would be handled on the sdk
-        let account_size = my_update_state_data.length() as u64;
-        let mut mojo_data = GenIxHandler::new(account_size.to_le_bytes());
-        // Seeds start as all zeros, just fill what you need
-        let fundraiser_slice = b"fundra43"; // 8 bytes exactly
-        mojo_data
-            .fill_second(fundraiser_slice.try_into().unwrap())
-            .fill_third(creator.pubkey().as_ref().try_into().unwrap());
+        let combined = encode_packed!(b"fundraise4", creator.pubkey().as_ref());
+        let digest = compute_hash(&combined);
+
+        let mojo_data = crate::state::GenIxHandler {
+            seeds: digest,
+            size: my_update_state_data.length().to_le_bytes(),
+        };
 
         // const MAX_LEN: usize = 128;
 
@@ -307,9 +298,6 @@ mod tests {
             accounts: vec![
                 AccountMeta::new(creator.pubkey(), true),
                 AccountMeta::new(creator_account.0, false),
-                // AccountMeta::new(creator_account.0, false),
-                // AccountMeta::new(system_program, false),
-                // AccountMeta::new((RENT_ID), false),
                 AccountMeta::new_readonly(
                     Pubkey::new_from_array(ephemeral_rollups_pinocchio::consts::MAGIC_CONTEXT_ID),
                     false,
@@ -356,16 +344,13 @@ mod tests {
         let buffer_account =
             Pubkey::find_program_address(&[BUFFER, creator_account.0.as_ref()], &PROGRAM_ID).0;
 
-        // all of these would be handled on the sdk
-        let account_size = my_update_state_data.length() as u64;
-        let mut mojo_data = GenIxHandler::new(account_size.to_le_bytes());
-        // Seeds start as all zeros, just fill what you need
-        let fundraiser_slice = b"fundra43"; // 8 bytes exactly
-        mojo_data
-            .fill_second(fundraiser_slice.try_into().unwrap())
-            .fill_third(creator.pubkey().as_ref().try_into().unwrap());
+        let combined = encode_packed!(b"fundraise4", creator.pubkey().as_ref());
+        let digest = compute_hash(&combined);
 
-        // const MAX_LEN: usize = 128;
+        let mojo_data = crate::state::GenIxHandler {
+            seeds: digest,
+            size: my_update_state_data.length().to_le_bytes(),
+        };
 
         let commit_ix_data = [
             vec![crate::instructions::MojoInstructions::Commit as u8],
@@ -403,8 +388,8 @@ mod tests {
                 // AccountMeta::new_readonly(delegation_record, false), // delegation record
                 // AccountMeta::new_readonly(delegation_metadata, false), // delegation metadata
                 // AccountMeta::new_readonly(system_program, false), // system program
-                // AccountMeta::new_readonly(delegation_program_id, false), // system program
-                // AccountMeta::new_readonly(state.system_program, false), // system program
+                AccountMeta::new_readonly(delegation_program_id, false), // system program
+                                                                         // AccountMeta::new_readonly(state.system_program, false), // system program
             ],
             data: commit_ix_data,
         };
@@ -434,14 +419,13 @@ mod tests {
         let creator_account = state.account_to_create;
         let my_update_state_data: MyPosition = MyPosition { x: 24, y: 12 };
 
-        // all of these would be handled on the sdk
-        let account_size = my_update_state_data.length() as u64;
-        let mut mojo_data = GenIxHandler::new(account_size.to_le_bytes());
-        // Seeds start as all zeros, just fill what you need
-        let fundraiser_slice = b"fundra43"; // 8 bytes exactly
-        mojo_data
-            .fill_second(fundraiser_slice.try_into().unwrap())
-            .fill_third(creator.pubkey().as_ref().try_into().unwrap());
+        let combined = encode_packed!(b"fundraise4", creator.pubkey().as_ref());
+        let digest = compute_hash(&combined);
+
+        let mojo_data = crate::state::GenIxHandler {
+            seeds: digest,
+            size: my_update_state_data.length().to_le_bytes(),
+        };
 
         // const MAX_LEN: usize = 128;
 

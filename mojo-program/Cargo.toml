@@ -3,7 +3,6 @@ name = "mojo-program"
 version = "0.1.0"
 edition = "2021"
 
-
 [lib]
 crate-type = ["cdylib", "lib"]
 
@@ -16,16 +15,13 @@ pinocchio-log = "0.5.1"
 pinocchio-associated-token-account = "0.2.0"
 bytemuck = { version = "1.23.0", features = ["derive"] }
 ephemeral-rollups-pinocchio = "=0.3.7"
-# borsh = "1.5.7"
-# ephemeral-rollups-sdk = "=0.2.12"
 
 
 [dev-dependencies]
 litesvm = "0.6.1"
 solana-native-token = "2.2.1"
 solana-system-interface = "1.0.0"
-# solana-address = "1.0.0"
-# solana-account = "2.2.1"
+solana-account = "2.2.1"
 solana-rpc-client = "2.2.1"
 solana-instruction = "2.2.1"
 solana-keypair = "2.2.1"
@@ -34,6 +30,4 @@ solana-signer = "2.2.1"
 solana-message = "2.2.1"
 solana-pubkey = "2.2.1"
 solana-sdk-ids = "2.2.1"
-# solana-hash = "3.0.0"
-pinocchio-log = "0.5.1"
-tokio = "1.48.0"
+sha2 = "0.10.9"

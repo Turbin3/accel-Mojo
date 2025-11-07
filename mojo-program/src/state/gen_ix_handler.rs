@@ -4,7 +4,7 @@ use pinocchio::pubkey::Pubkey;
 #[repr(C)]
 #[derive(Pod, Zeroable, Clone, Copy, Debug, PartialEq)]
 pub struct GenIxHandler {
-    pub seeds: [u8; 128], // 8 + 8 + 32 + 32 + 32 [string, string, pubkey, pubkey, pubkey] == 112 .. but Pod can only serialize 128 properly
+    pub seeds: [u8; 32], // 32 bytes for seeds hash
     pub size: [u8; 8],
 }
 
@@ -27,7 +27,7 @@ impl GenIxHandler {
     // Create a new empty GenIxHandler
     pub fn new(size: [u8; 8]) -> Self {
         Self {
-            seeds: [0u8; 128],
+            seeds: [0u8; 32],
             size,
         }
     }

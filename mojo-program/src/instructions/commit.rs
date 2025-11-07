@@ -13,7 +13,7 @@ pub fn process_commit_instruction(
     instruction_data: &[u8],
 ) -> ProgramResult {
     // need to discuss , how to handle magic context and magic program
-    let [creator, creator_account, magic_context, magic_program] = accounts else {
+    let [creator, creator_account, magic_context, magic_program, rest] = accounts else {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
 
@@ -45,17 +45,15 @@ pub fn process_commit_instruction(
     let mojo_ser_data = bytemuck::try_pod_read_unaligned::<GenIxHandler>(mojo_data)
         .map_err(|_| ProgramError::InvalidInstructionData)?;
 
-    let [seed1, seed2, seed3, seed4, seed5] = mojo_ser_data.get_seed_slices();
+    let seeds_data = &mojo_ser_data.seeds;
+    // let seed_bump = [bump];
+    let seeds = &[seeds_data, creator.key().as_ref()];
 
-    // Derive PDA using all five seeds and verify it matches creator_account
-    let (derived_pda, _bump) =
-        pubkey::find_program_address(&[seed1, seed2, seed3, seed4, seed5], &crate::ID);
+    let (derived_pda, bump) = pubkey::find_program_address(seeds, &crate::id());
 
     if creator_account.key() != &derived_pda {
         return Err(ProgramError::InvalidSeeds);
     }
-
-    // log!("{}", &accounts[1..2]);
 
     {
         let mut some_fist_account = creator_account.try_borrow_mut_data().unwrap();

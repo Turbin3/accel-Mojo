@@ -1725,6 +1725,8 @@ dependencies = [
  "pinocchio-pubkey 0.3.0 (git+https://github.com/anza-xyz/pinocchio.git)",
  "pinocchio-system",
  "pinocchio-token 0.4.0",
+ "sha2 0.10.9",
+ "solana-account",
  "solana-instruction",
  "solana-keypair",
  "solana-message",
@@ -1735,7 +1737,6 @@ dependencies = [
  "solana-signer",
  "solana-system-interface",
  "solana-transaction",
- "tokio",
 ]
 
 [[package]]

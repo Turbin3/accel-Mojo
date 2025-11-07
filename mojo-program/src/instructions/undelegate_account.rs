@@ -1,15 +1,12 @@
 use pinocchio::{
-    account_info::AccountInfo, program_error::ProgramError, pubkey::find_program_address,
-    ProgramResult,
+    account_info::AccountInfo, instruction::Signer, program_error::ProgramError, pubkey,
+    pubkey::find_program_address, seeds, ProgramResult,
 };
 use pinocchio_log::log;
 
 use crate::state::GenIxHandler;
 
-pub fn process_undelegate_account(
-    accounts: &[AccountInfo],
-    instruction_data: &[u8],
-) -> ProgramResult {
+pub fn process_undelegate_account(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
     log!("i was here");
     let [creator, mojo_account_pda, magic_context, magic_program] = accounts else {
         return Err(ProgramError::NotEnoughAccountKeys);
@@ -19,47 +16,26 @@ pub fn process_undelegate_account(
     if !creator.is_signer() {
         return Err(ProgramError::MissingRequiredSignature);
     }
+    // check that account_to_create is empty
+    assert!(
+        !&mojo_account_pda.data_is_empty(),
+        "Account should be empty"
+    );
 
-    // // 0xAbim: Load account data using bytemuck
-    // let mojo_bytes = mojo_account_pda.try_borrow_data()?;
-    // log!("i was here 2");
+    let mojo_data = &data[0..GenIxHandler::LEN];
+    let mojo_ser_data = bytemuck::from_bytes::<GenIxHandler>(mojo_data);
 
-    // if mojo_bytes.len() < GenIxHandler::LEN {
-    //     log!("i was here 3-1");
+    let seeds_data = &mojo_ser_data.seeds;
+    // let seed_bump = [bump];
+    let seeds = &[seeds_data, creator.key().as_ref()];
 
-    //     return Err(ProgramError::InvalidAccountData);
-    // }
+    let (derived_pda, bump) = pubkey::find_program_address(seeds, &crate::id());
 
-    log!("i was here 4");
-
-    // // 0xAbim: Validate the data exists
-    // let mojo_data: &GenIxHandler = bytemuck::try_from_bytes(&mojo_bytes[..GenIxHandler::LEN])
-    //     .map_err(|_| ProgramError::InvalidAccountData)?;
-
-    log!("i was here 5");
-
-    // // 0xAbim: Extract seeds from account data
-    // let size = u64::from_le_bytes(mojo_data.size) as usize;
-    // if size > 256 || size == 0 {
-    //     return Err(ProgramError::InvalidArgument);
-    // }
-    // log!("i was here 6");
-
-    // let seeds_slice = &mojo_data.seeds[..size];
-
-    // // 0xAbim: Verify PDA derivation with extracted seeds
-    // let (derived_pda, _) = find_program_address(&[seeds_slice], &crate::ID);
-
-    // if derived_pda != *mojo_account_pda.key() {
-    //     return Err(ProgramError::InvalidSeeds);
-    // }
-
-    log!("i was here 6");
-
-    // 0xAbim: Pass actual account references in correct format
-    // Function expects: creator, accounts: &[AccountInfo], magic_context, magic_program
-    // Still has issues with the acounts passed in to the function
-    let accounts_to_commit = &[mojo_account_pda];
+    assert_eq!(
+        &derived_pda,
+        mojo_account_pda.key(),
+        "You provided the wrong user pda"
+    );
 
     ephemeral_rollups_pinocchio::instruction::commit_and_undelegate_accounts(
         creator,
@@ -69,6 +45,5 @@ pub fn process_undelegate_account(
     )
     .map_err(|_| ProgramError::InvalidAccountData)?;
 
-    // undelegate()
     Ok(())
 }
