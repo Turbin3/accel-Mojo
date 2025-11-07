@@ -15,7 +15,7 @@ use crate::state::GenIxHandler;
 
 pub fn update_delegated_account(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
     // get all accounts
-    let [creator, account_to_update, _system_program, _rent_sysvar @ ..] = accounts else {
+    let [creator, account_to_update, rest @ ..] = accounts else {
         return Err(pinocchio::program_error::ProgramError::NotEnoughAccountKeys);
     };
 
@@ -65,6 +65,7 @@ pub fn update_delegated_account(accounts: &[AccountInfo], data: &[u8]) -> Progra
 
     let mut some_fist_account = account_to_update.try_borrow_mut_data().unwrap();
 
+    log!("current data is {}", some_fist_account.as_ref());
     // // this will modify the account state
     some_fist_account.copy_from_slice(&data[GenIxHandler::LEN..]);
     Ok(())
