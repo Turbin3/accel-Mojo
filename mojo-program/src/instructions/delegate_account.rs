@@ -7,28 +7,23 @@ use ephemeral_rollups_pinocchio::{
     utils::{close_pda_acc, cpi_delegate, make_seed_buf},
 };
 use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{Seed, Signer},
-    program_error::ProgramError,
-    pubkey,
-    pubkey::find_program_address,
-    seeds,
-    sysvars::{rent::Rent, Sysvar},
-    ProgramResult,
+    ProgramResult, account_info::AccountInfo, instruction::{Seed, Signer}, program_error::ProgramError, pubkey::find_program_address, seeds
 };
-
-use pinocchio_log::log;
-use pinocchio_system::instructions::{Assign, CreateAccount};
+use ephemeral_rollups_pinocchio::{
+    types::DelegateAccountArgs, utils::{close_pda_acc, cpi_delegate}, consts::{DELEGATION_PROGRAM_ID, BUFFER}
+};
+use pinocchio_system::instructions::{CreateAccount, Assign};
+use crate::state::GenIxHandler;
 
 #[allow(clippy::cloned_ref_to_slice_refs)]
-pub fn process_delegate_account(
+pub fn process_delegate_account (
     accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {
     // 0xAbim: Here goes the accounts to be delegated.
-    // 0. [] The creator acts as the payer
+    // 0. [] The creator acts as the payer 
     // 1. [] the account pda (is_writable)
-    // 2. [] the owner' program
+    // 2. [] the owner' program 
     // 3. [] the buffer account
     // 4. [] the delegation record
     // 5. [] the delegation metadata
@@ -39,6 +34,7 @@ pub fn process_delegate_account(
     else {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
+
 
     // Read GenIxHandler from instruction data
     if instruction_data.len() < GenIxHandler::LEN {

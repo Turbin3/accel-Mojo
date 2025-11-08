@@ -1,5 +1,4 @@
 use bytemuck::{Pod, Zeroable};
-use pinocchio::pubkey::Pubkey;
 
 #[repr(C)]
 #[derive(Pod, Zeroable, Clone, Copy, Debug, PartialEq)]

@@ -49,7 +49,7 @@ pub fn create_state_account(accounts: &[AccountInfo], data: &[u8]) -> ProgramRes
         lamports: Rent::get()?.minimum_balance(usize::from_le_bytes(mojo_ser_data.size)),
         owner: &crate::ID,
         space: u64::from_le_bytes(mojo_ser_data.size),
-        to: &*account_to_create,
+        to: account_to_create,
     }
     .invoke_signed(&signers)?;
 

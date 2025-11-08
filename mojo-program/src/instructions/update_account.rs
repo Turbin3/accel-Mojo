@@ -1,10 +1,8 @@
 use pinocchio::{
     account_info::AccountInfo,
     instruction::Signer,
-    msg,
-    pubkey::{self, Pubkey},
+    pubkey::{self},
     seeds,
-    sysvars::{rent::Rent, Sysvar},
     ProgramResult,
 };
 
