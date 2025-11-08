@@ -19,8 +19,6 @@ pub fn create_state_account(accounts: &[AccountInfo], data: &[u8]) -> ProgramRes
     let mojo_data = &data[0..GenIxHandler::LEN];
     let mojo_ser_data = bytemuck::from_bytes::<GenIxHandler>(mojo_data);
 
-    let [seed1, seed2, seed3, seed4, seed5] = mojo_ser_data.get_seed_slices();
-
     // checks
     // check that maker is a signer ✅
     assert!(&creator.is_signer(), "Creator should be a signer");
@@ -29,18 +27,19 @@ pub fn create_state_account(accounts: &[AccountInfo], data: &[u8]) -> ProgramRes
         &account_to_create.data_is_empty(),
         "Account should be empty"
     );
-    // check that owner of account_to_create is this program
 
-    // NOTE Always use all 5 seeds
-    let (account_pda, bump) =
-        pubkey::find_program_address(&[seed1, seed2, seed3, seed4, seed5], &crate::ID);
+    let seeds_data = &mojo_ser_data.seeds;
+    // let seed_bump = [bump];
+    let seeds = &[seeds_data, creator.key().as_ref()];
 
-    let seed_bump = [bump];
-    let seeds = seeds!(seed1, seed2, seed3, seed4, seed5, &seed_bump);
-    let signer = Signer::from(&seeds);
+    let (derived_pda, bump) = pubkey::find_program_address(seeds, &crate::id());
+    let bump_binding = [bump];
+    // let seeds = seeds!(seed1, seed2, seed3, seed4, seed5, &seed_bump);
+    let signer_seeds = seeds!(seeds_data, creator.key().as_ref(), &bump_binding);
+    let signers: [Signer<'_, '_>; 1] = [Signer::from(&signer_seeds[..])];
 
     assert_eq!(
-        &account_pda,
+        &derived_pda,
         account_to_create.key(),
         "You provided the wrong user pda"
     );
@@ -52,7 +51,7 @@ pub fn create_state_account(accounts: &[AccountInfo], data: &[u8]) -> ProgramRes
         space: u64::from_le_bytes(mojo_ser_data.size),
         to: account_to_create,
     }
-    .invoke_signed(&[signer])?;
+    .invoke_signed(&signers)?;
 
     let mut some_fist_account = account_to_create.try_borrow_mut_data().unwrap();
 

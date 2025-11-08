@@ -9,7 +9,7 @@ mod state;
 mod tests;
 
 entrypoint!(process_instruction);
-pinocchio_pubkey::declare_id!("3jyHnrGq1z9YiGyx5QEUDR5hnZ7PYeYW5stFUq2skYZz");
+pinocchio_pubkey::declare_id!("58sfdJaiSM7Ccr6nHNXXmwbfT6e9s8Zkee6zdRSH8CeS");
 
 
 pub fn process_instruction(
@@ -23,6 +23,7 @@ pub fn process_instruction(
         .split_first()
         .ok_or(pinocchio::program_error::ProgramError::InvalidInstructionData)?;
 
+    log!("discri {}", *discriminator);
     match MojoInstructions::try_from(discriminator)? {
         MojoInstructions::CreateAccount => {
             instructions::create_state_account(accounts, data)?;
@@ -30,16 +31,16 @@ pub fn process_instruction(
         MojoInstructions::DelegateAccount => {
             instructions::process_delegate_account(accounts, data)?;
         }
-        MojoInstructions::UndelegateAccount => {
-            instructions::process_undelegate_account(accounts, data)?;
+        MojoInstructions::Commit => {
+            instructions::process_commit_instruction(accounts, data)?;
         }
         MojoInstructions::UpdateDelegatedAccount => {
             instructions::update_delegated_account(accounts, data)?;
         }
-        MojoInstructions::Commit => {
-            instructions::process_commit_instruction(accounts, data)?;
+        MojoInstructions::UndelegateAccount => {
+            instructions::process_undelegate_account(accounts, data)?;
         }
-        _ => return Err(pinocchio::program_error::ProgramError::InvalidInstructionData),
+        _ => return Err(pinocchio::program_error::ProgramError::IncorrectAuthority),
     }
     Ok(())
 }
