@@ -29,7 +29,7 @@ mod er_tests {
     const RPC_ER_URL: &str = "https://devnet.magicblock.app/";
     //
 
-    use std::os::macos::raw::stat;
+    // use std::os::macos::raw::stat;
 
     use super::*;
     use pinocchio_log::log;
