@@ -1,0 +1,26 @@
+[package]
+name = "mojo-sdk"
+version = "0.1.0"
+edition = "2021"
+authors = ["names <emails>"]
+description = "Rust SDK for building Solana Games on-chain"
+license = ""
+repository = ""
+keywords = ["solana", "blockchain", "sdk", "gaming", "game", "engine"]
+
+[lib]
+name = "mojo_sdk"
+path = "src/lib.rs"
+
+[dependencies]
+solana-sdk = "1.18"
+solana-client = "1.18"
+
+anyhow = "1.0"
+thiserror = "1.0"
+
+sha2 = "0.10.9"
+
+bytemuck = { version = "1.14", features = ["derive"] }
+# borsh = { version = "1.0", features = ["derive"] }
+
