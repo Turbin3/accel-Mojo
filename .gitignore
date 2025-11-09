@@ -1,1 +1,2 @@
-/target
+# Should ignore target dir at any level
+target/
