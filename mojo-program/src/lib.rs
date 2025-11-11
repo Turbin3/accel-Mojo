@@ -1,5 +1,10 @@
+#![no_std]
 #![allow(unexpected_cfgs)]
-use pinocchio::{account_info::AccountInfo, entrypoint, pubkey::Pubkey, ProgramResult};
+use pinocchio::{account_info::AccountInfo, 
+    entrypoint, 
+    pubkey::Pubkey, 
+    no_allocator, nostd_panic_handler,
+    ProgramResult};
 
 use crate::instructions::MojoInstructions;
 
@@ -8,9 +13,17 @@ mod instructions;
 mod state;
 mod tests;
 
-entrypoint!(process_instruction);
-pinocchio_pubkey::declare_id!("3jyHnrGq1z9YiGyx5QEUDR5hnZ7PYeYW5stFUq2skYZz");
+no_allocator!();
+// Use the no_std panic handler.
+nostd_panic_handler!();
 
+// entrypoint!(process_instruction);
+pinocchio_pubkey::declare_id!("HGqcFg8D1wSMDeaoeUTh1uetHVgwr1Q5VHMyXrgyD3vL");
+
+pub mod program {
+    pinocchio_pubkey::declare_id!("HGqcFg8D1wSMDeaoeUTh1uetHVgwr1Q5VHMyXrgyD3vL");
+    pub use ephemeral_rollups_pinocchio::consts::DELEGATION_PROGRAM_ID;
+}
 
 pub fn process_instruction(
     program_id: &Pubkey,
@@ -18,6 +31,9 @@ pub fn process_instruction(
     instruction_data: &[u8],
 ) -> ProgramResult {
     assert_eq!(program_id, &ID);
+    // let [discriminator, instruction_data @ ..] = instruction_data else {
+    //     return Err(pinocchio::program_error::ProgramError::InvalidArgument);
+    // };
 
     let (discriminator, data) = instruction_data
         .split_first()

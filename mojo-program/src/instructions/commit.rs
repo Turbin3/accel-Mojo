@@ -5,7 +5,7 @@ use ephemeral_rollups_pinocchio::{
 
 use pinocchio::{account_info::AccountInfo, program_error::ProgramError, pubkey, ProgramResult};
 
-use crate::state::GenIxHandler;
+use crate::state::transaction_handler::TransactionHandler;
 
 pub fn process_commit_instruction(
     accounts: &[AccountInfo],
@@ -36,12 +36,12 @@ pub fn process_commit_instruction(
         return Err(ProgramError::InvalidAccountData);
     }
 
-    // parse GenIxHandler from instruction data
-    if instruction_data.len() < GenIxHandler::LEN {
+    // parse TransactionHandler from instruction data
+    if instruction_data.len() < TransactionHandler::LEN {
         return Err(ProgramError::InvalidInstructionData);
     }
-    let mojo_data = &instruction_data[0..GenIxHandler::LEN];
-    let mojo_ser_data = bytemuck::try_pod_read_unaligned::<GenIxHandler>(mojo_data)
+    let mojo_data = &instruction_data[0..TransactionHandler::LEN];
+    let mojo_ser_data = bytemuck::try_pod_read_unaligned::<TransactionHandler>(mojo_data)
         .map_err(|_| ProgramError::InvalidInstructionData)?;
 
     let [seed1, seed2, seed3, seed4, seed5] = mojo_ser_data.get_seed_slices();

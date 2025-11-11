@@ -1,22 +1,31 @@
 use bytemuck::{Pod, Zeroable};
 use pinocchio::sysvars::rent::RENT_ID;
 use solana_client::rpc_client::RpcClient;
+use solana_commitment_config::CommitmentConfig;
 use solana_sdk::{
     account::Account,
     instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
     signature::{Keypair, Signer},
-    sysvar,
     transaction::Transaction,
 };
 use solana_sdk_ids::system_program;
+use std::fs;
 use std::time::Duration;
+use pinocchio_log::log;
 
 use crate::state::GenIxHandler;
 
 // Configuration
-const RPC_URL: &str = "http://localhost:8899"; // Base layer (solana-test-validator)
-const ER_RPC_URL: &str = "http://localhost:7799"; // Ephemeral Rollup validator
+// const RPC_URL: &str = "http://0.0.0.0:8899"; // Base layer (solana-test-validator)
+// const ER_RPC_URL: &str = "http://0.0.0.0:7799"; // Ephemeral Rollup validator
+
+// 0xAbim: Devnet config
+const RPC_URL: &str = "https://devnet-eu.magicblock.app/"; // Base layer (solana-test-validator)
+const ER_RPC_URL: &str = "https://devnet-eu.magicblock.app"; // Ephemeral Rollup validator
+const EU_ACCOUNT_OWNER: [u8; 32] = pinocchio_pubkey::pubkey!("MEUGGrYPxKk17hCr7wpT6s8dtNokZj5U2L57vjYMS8e");
+
+const PAYER_KEYPAIR_PATH: &str = "/home/eaa/accel_builders/accel-Mojo/target/dev_wallet_2.json"; // Path to funded keypair
 const PROGRAM_ID: Pubkey = Pubkey::new_from_array(crate::ID);
 
 // MagicBlock constants for localhost
@@ -25,6 +34,7 @@ const MAGIC_PROGRAM_ID: [u8; 32] = ephemeral_rollups_pinocchio::consts::MAGIC_PR
 const DELEGATION_PROGRAM_ID: [u8; 32] = ephemeral_rollups_pinocchio::consts::DELEGATION_PROGRAM_ID;
 const BUFFER: &[u8] = ephemeral_rollups_pinocchio::consts::BUFFER;
 
+// Sample instructions
 #[repr(C)]
 #[derive(Pod, Zeroable, Clone, Copy, Debug, PartialEq)]
 pub struct MyPosition {
@@ -55,14 +65,37 @@ pub struct TestEnv {
 
 impl TestEnv {
     pub fn new() -> Self {
+        println!("Initializing TestEnv...");
+        println!("  Base RPC: {}", RPC_URL);
+        println!("  ER RPC: {}", ER_RPC_URL);
+
         let base_client = RpcClient::new_with_timeout(RPC_URL.to_string(), Duration::from_secs(30));
 
         let er_client =
-            RpcClient::new_with_timeout(ER_RPC_URL.to_string(), Duration::from_secs(30));
+                RpcClient::new_with_timeout(ER_RPC_URL.to_string(), Duration::from_secs(30));
 
-        // In real tests, you'd load a keypair with SOL
-        // For now, creating a new one (will need airdrop)
-        let payer = Keypair::new();
+        // Test connectivity
+        match base_client.get_health() {
+            Ok(_) => println!("  ✓ Base layer RPC is healthy"),
+            Err(e) => println!("  ✗ Base layer RPC error: {}", e),
+        }
+
+        match er_client.get_health() {
+            Ok(_) => println!("  ✓ ER RPC is healthy"),
+            Err(e) => println!("  ✗ ER RPC error: {}", e),
+        }
+
+        // Load payer keypair from file
+        let payer = solana_sdk::signature::read_keypair_file(PAYER_KEYPAIR_PATH)
+            .expect("Failed to load payer keypair from file");
+
+        println!("  Loaded payer: {}", payer.pubkey());
+
+        // Check balance
+        match base_client.get_balance(&payer.pubkey()) {
+            Ok(balance) => println!("  Payer balance: {} SOL", balance as f64 / 1_000_000_000.0),
+            Err(e) => println!("  ✗ Failed to get payer balance: {}", e),
+        }
 
         Self {
             base_client,
@@ -71,19 +104,45 @@ impl TestEnv {
         }
     }
 
+    /// Load keypair from JSON file
+//   fn load_keypair(path: &str) -> Result<Keypair, Box<dyn Error>> {
+//     let keypair = read_keypair_file(PAYER_KEYPAIR_PATH)?;
+//     Ok(keypair);
+//     }
+
     /// Airdrop SOL to payer on base layer
     pub fn airdrop(&self, lamports: u64) -> Result<(), Box<dyn std::error::Error>> {
+        println!("Requesting airdrop of {} lamports to {}", lamports, self.payer.pubkey());
+
         let signature = self
             .base_client
             .request_airdrop(&self.payer.pubkey(), lamports)?;
 
-        // Wait for confirmation
-        self.base_client.confirm_transaction(&signature)?;
+        // Wait for confirmation with finalized commitment
+        loop {
+            let confirmed = self.base_client
+                .confirm_transaction_with_spinner(
+                    &signature,
+                    &self.base_client.get_latest_blockhash()?,
+                    CommitmentConfig::confirmed(),
+                );
+
+            if confirmed.is_ok() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(500));
+        }
+
+        // Verify balance
+        let balance = self.base_client.get_balance(&self.payer.pubkey())?;
         println!(
-            "Airdropped {} lamports to {}",
+            "✅ Airdropped {} lamports to {} (balance: {})",
             lamports,
-            self.payer.pubkey()
+            self.payer.pubkey(),
+            balance
         );
+
+        assert!(balance >= lamports, "Airdrop failed - insufficient balance");
         Ok(())
     }
 
@@ -133,10 +192,8 @@ impl TestEnv {
         Ok(signature.to_string())
     }
 
-    /// Helper to log compute units consumed
+    // Helper to log compute units consumed
     // fn log_compute_units(&self, signature: &solana_sdk::signature::Signature, client: &RpcClient, layer: &str) {
-    //     use solana_sdk::commitment_config::CommitmentConfig;
-
     //     if let Ok(tx_response) = client.get_transaction(signature, CommitmentConfig::confirmed()) {
     //         if let Some(meta) = tx_response.transaction.meta {
     //             if let Some(cu) = meta.compute_units_consumed {
@@ -165,6 +222,7 @@ impl TestEnv {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
 
     /// Test 1: Create Account on Base Layer
@@ -174,13 +232,14 @@ mod tests {
         println!("\n=== Test 1: Create Account ===");
 
         let env = TestEnv::new();
+                // let env = TestEnv::new();
+        // env.airdrop(10_000_000_000).expect("Airdrop failed");
 
-        // Airdrop SOL to payer
-        env.airdrop(10_000_000_000).expect("Airdrop failed");
 
         // Derive PDA
         let (account_pda, _bump) = Pubkey::find_program_address(
             &[
+                // &[0u8; 8],
                 &[0u8; 8],
                 b"fundrais",
                 env.payer.pubkey().as_ref(),
@@ -191,16 +250,29 @@ mod tests {
         );
 
         println!("PDA to create: {}", account_pda);
+        
 
         // Prepare instruction data
         let my_state_data = MyPosition::new(24, 12);
         let account_size = my_state_data.length() as u64;
         let mut mojo_data = GenIxHandler::new(account_size.to_le_bytes());
 
+        // 0xAbim: Added some bytes into the ix
         mojo_data
+            .fill_first(&[0u8; 8])
             .fill_second(b"fundrais".try_into().unwrap())
-            .fill_third(env.payer.pubkey().as_ref().try_into().unwrap());
+            .fill_third(env.payer.pubkey().as_ref().try_into().unwrap())
+            .fill_fourth(&[0u8; 32])  
+            .fill_fifth(&[0u8; 32]);
 
+            // After deriving PDA
+println!("Test PDA: {}", account_pda);
+println!("Test seeds:");
+println!("  [0] {:02x?}", &[0u8; 8]);
+println!("  [1] {:02x?}", b"fundrais");
+println!("  [2] {:02x?}", env.payer.pubkey().as_ref());
+println!("  [3] {:02x?}", &[0u8; 32]);
+println!("  [4] {:02x?}", &[0u8; 32]);
         let create_ix_data = [
             vec![crate::instructions::MojoInstructions::CreateAccount as u8],
             mojo_data.to_bytes(),
@@ -215,7 +287,8 @@ mod tests {
                 AccountMeta::new(env.payer.pubkey(), true),
                 AccountMeta::new(account_pda, false),
                 AccountMeta::new(Pubkey::from(system_program::ID.to_bytes()), false),
-                AccountMeta::new(Pubkey::from(RENT_ID), false),
+                AccountMeta::new(Pubkey::from(crate::ID), false),
+                AccountMeta::new(Pubkey::from(EU_ACCOUNT_OWNER), false), 
             ],
             data: create_ix_data,
         };
@@ -256,7 +329,9 @@ mod tests {
         println!("\n=== Test 2: Delegate Account ===");
 
         let env = TestEnv::new();
-        env.airdrop(10_000_000_000).expect("Airdrop failed");
+                // let env = TestEnv::new();
+        // env.airdrop(10_000_000_000).expect("Airdrop failed");
+
 
         // First create the account (same as test 1)
         let (account_pda, _bump) = Pubkey::find_program_address(
@@ -274,31 +349,35 @@ mod tests {
         let my_state_data = MyPosition::new(24, 12);
         let account_size = my_state_data.length() as u64;
         let mut mojo_data = GenIxHandler::new(account_size.to_le_bytes());
+              // 0xAbim: Added some bytes into the ix
         mojo_data
+            .fill_first(&[0u8; 8])
             .fill_second(b"fundrais".try_into().unwrap())
-            .fill_third(env.payer.pubkey().as_ref().try_into().unwrap());
+            .fill_third(env.payer.pubkey().as_ref().try_into().unwrap())
+            .fill_fourth(&[0u8; 32])  
+            .fill_fifth(&[0u8; 32]);
 
-        let create_ix_data = [
-            vec![crate::instructions::MojoInstructions::CreateAccount as u8],
-            mojo_data.to_bytes(),
-            my_state_data.to_bytes(),
-        ]
-        .concat();
+        // let create_ix_data = [
+        //     vec![crate::instructions::MojoInstructions::CreateAccount as u8],
+        //     mojo_data.to_bytes(),
+        //     my_state_data.to_bytes(),
+        // ]
+        // .concat();
 
-        let create_ix = Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new(env.payer.pubkey(), true),
-                AccountMeta::new(account_pda, false),
-                AccountMeta::new(Pubkey::from(system_program::ID.to_bytes()), false),
-                AccountMeta::new(Pubkey::from(RENT_ID), false),
-            ],
-            data: create_ix_data,
-        };
+        // let create_ix = Instruction {
+        //     program_id: PROGRAM_ID,
+        //     accounts: vec![
+        //         AccountMeta::new(env.payer.pubkey(), true),
+        //         AccountMeta::new(account_pda, false),
+        //         AccountMeta::new(Pubkey::from(system_program::ID.to_bytes()), false),
+        //         AccountMeta::new(Pubkey::from(RENT_ID), false),
+        //     ],
+        //     data: create_ix_data,
+        // };
 
-        env.send_and_confirm_base(create_ix)
-            .expect("Failed to create account");
-        println!("✅ Account created: {}", account_pda);
+        // env.send_and_confirm_base(create_ix)
+        //     .expect("Failed to create account");
+        // println!("✅ Account created: {}", account_pda);
 
         // Now delegate the account
         let buffer_account =
@@ -311,6 +390,7 @@ mod tests {
         )
         .0;
 
+        log!("Test stops here at metadata");
         let delegation_metadata = Pubkey::find_program_address(
             &[b"delegation-metadata", account_pda.as_ref()],
             &delegation_program_id,
@@ -323,16 +403,17 @@ mod tests {
         ]
         .concat();
 
+        log!("Test stops here at delegation ix");
         let delegate_ix = Instruction {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(env.payer.pubkey(), true),
-                AccountMeta::new(account_pda, false),
-                AccountMeta::new(PROGRAM_ID, false), // owner program
+                AccountMeta::new(account_pda, true),
+                AccountMeta::new(EU_ACCOUNT_OWNER.into(), false), // owner program
                 AccountMeta::new(buffer_account, false),
                 AccountMeta::new(delegation_record, false),
                 AccountMeta::new(delegation_metadata, false),
-                AccountMeta::new(Pubkey::from(system_program::ID.to_bytes()), false),
+                // AccountMeta::new(Pubkey::from(system_program::ID.to_bytes()), false),
                 AccountMeta::new(delegation_program_id, false),
             ],
             data: delegate_ix_data,
@@ -367,7 +448,9 @@ mod tests {
         println!("\n=== Test 3: Update Delegated Account in ER ===");
 
         let env = TestEnv::new();
-        env.airdrop(10_000_000_000).expect("Airdrop failed");
+                // let env = TestEnv::new();
+        // env.airdrop(10_000_000_000).expect("Airdrop failed");
+
 
         // Setup: Create and delegate account (combining test 1 and 2)
         let (account_pda, _bump) = Pubkey::find_program_address(
@@ -502,7 +585,7 @@ mod tests {
         println!("\n=== Test 4: Commit Account from ER to Base Layer ===");
 
         let env = TestEnv::new();
-        env.airdrop(10_000_000_000).expect("Airdrop failed");
+        // env.airdrop(10_000_000_000).expect("Airdrop failed");
 
         // Setup: Create, delegate, and update account (combining previous tests)
         let (account_pda, _bump) = Pubkey::find_program_address(
@@ -579,7 +662,7 @@ mod tests {
         println!("\n=== Test 5: Undelegate Account ===");
 
         let env = TestEnv::new();
-        env.airdrop(10_000_000_000).expect("Airdrop failed");
+        // env.airdrop(10_000_000_000).expect("Airdrop failed");
 
         // Setup: Create and delegate account
         let (account_pda, _bump) = Pubkey::find_program_address(

@@ -8,7 +8,7 @@ use pinocchio::{
 
 use pinocchio_log::log;
 
-use crate::state::GenIxHandler;
+use crate::state::transaction_handler::TransactionHandler;
 
 pub fn update_delegated_account(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
     // get all accounts
@@ -16,8 +16,8 @@ pub fn update_delegated_account(accounts: &[AccountInfo], data: &[u8]) -> Progra
         return Err(pinocchio::program_error::ProgramError::NotEnoughAccountKeys);
     };
 
-    let mojo_data = &data[0..GenIxHandler::LEN];
-    let mojo_ser_data = bytemuck::from_bytes::<GenIxHandler>(mojo_data);
+    let mojo_data = &data[0..TransactionHandler::LEN];
+    let mojo_ser_data = bytemuck::from_bytes::<TransactionHandler>(mojo_data);
 
     let [seed1, seed2, seed3, seed4, seed5] = mojo_ser_data.get_seed_slices();
 
@@ -63,6 +63,6 @@ pub fn update_delegated_account(accounts: &[AccountInfo], data: &[u8]) -> Progra
     let mut some_fist_account = account_to_update.try_borrow_mut_data().unwrap();
 
     // // this will modify the account state
-    some_fist_account.copy_from_slice(&data[GenIxHandler::LEN..]);
+    some_fist_account.copy_from_slice(&data[TransactionHandler::LEN..]);
     Ok(())
 }

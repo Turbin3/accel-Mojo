@@ -1,14 +1,17 @@
+extern crate alloc;
+
+use alloc::vec::Vec;
 use bytemuck::{Pod, Zeroable};
 
 #[repr(C)]
 #[derive(Pod, Zeroable, Clone, Copy, Debug, PartialEq)]
-pub struct GenIxHandler {
+pub struct TransactionHandler {
     pub seeds: [u8; 128], // 8 + 8 + 32 + 32 + 32 [string, string, pubkey, pubkey, pubkey] == 112 .. but Pod can only serialize 128 properly
     pub size: [u8; 8],
 }
 
-impl GenIxHandler {
-    pub const LEN: usize = core::mem::size_of::<GenIxHandler>();
+impl TransactionHandler {
+    pub const LEN: usize = core::mem::size_of::<TransactionHandler>();
     pub fn to_bytes(&self) -> Vec<u8> {
         bytemuck::bytes_of(self).to_vec()
     }
@@ -23,7 +26,7 @@ impl GenIxHandler {
         ]
     }
 
-    // Create a new empty GenIxHandler
+    // Create a new empty TransactionHandler
     pub fn new(size: [u8; 8]) -> Self {
         Self {
             seeds: [0u8; 128],
