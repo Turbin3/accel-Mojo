@@ -148,7 +148,7 @@ mod er_tests {
     const RPC_ER_URL: &str = "https://devnet.magicblock.app/";
     //
 
-    use std::os::macos::raw::stat;
+    // use std::os::macos::raw::stat;
 
     use super::*;
     use pinocchio_log::log;
@@ -199,7 +199,7 @@ mod er_tests {
         let payer = read_keypair_file("dev_wallet.json").expect("Couldn't find wallet file");
 
         // Derive the PDA for the escrow account using the maker's public key and a seed value
-        let combined = encode_packed!(b"fundraise4", payer.pubkey().as_ref());
+        let combined = encode_packed!(b"bird", payer.pubkey().as_ref());
         let account_to_create = Pubkey::find_program_address(
             &[&compute_hash(&combined), payer.pubkey().as_ref()],
             &PROGRAM_ID,
@@ -318,7 +318,7 @@ mod er_tests {
 
         let my_state_data = MyPosition { x: 24, y: 12 };
 
-        let combined = encode_packed!(b"fundraise4", creator.pubkey().as_ref());
+        let combined = encode_packed!(b"bird", creator.pubkey().as_ref());
         let digest = compute_hash(&combined);
 
         let mojo_data = crate::state::GenIxHandler {
@@ -432,7 +432,7 @@ mod er_tests {
 
         let my_state_data: MyPosition = MyPosition { x: 24, y: 12 };
 
-        let combined = encode_packed!(b"fundraise4", creator.pubkey().as_ref());
+        let combined = encode_packed!(b"bird", creator.pubkey().as_ref());
         let digest = compute_hash(&combined);
 
         let mojo_data = crate::state::GenIxHandler {
@@ -502,7 +502,7 @@ mod er_tests {
 
         let my_update_state_data: MyPosition = MyPosition { x: 24, y: 12 };
 
-        let combined = encode_packed!(b"fundraise4", creator.pubkey().as_ref());
+        let combined = encode_packed!(b"bird", creator.pubkey().as_ref());
         let digest = compute_hash(&combined);
 
         let mojo_data = crate::state::GenIxHandler {
@@ -574,7 +574,7 @@ mod er_tests {
         let buffer_account =
             Pubkey::find_program_address(&[BUFFER, creator_account.0.as_ref()], &PROGRAM_ID).0;
 
-        let combined = encode_packed!(b"fundraise4", creator.pubkey().as_ref());
+        let combined = encode_packed!(b"bird", creator.pubkey().as_ref());
         let digest = compute_hash(&combined);
 
         let mojo_data = crate::state::GenIxHandler {
@@ -649,7 +649,7 @@ mod er_tests {
         let creator_account = state.account_to_create;
         let my_update_state_data: MyPosition = MyPosition { x: 24, y: 12 };
 
-        let combined = encode_packed!(b"fundraise4", creator.pubkey().as_ref());
+        let combined = encode_packed!(b"bird", creator.pubkey().as_ref());
         let digest = compute_hash(&combined);
 
         let mojo_data = crate::state::GenIxHandler {
