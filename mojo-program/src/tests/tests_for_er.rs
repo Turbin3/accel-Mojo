@@ -26,7 +26,7 @@ mod er_tests {
     // pub const RPC_URL: &str = "http://127.0.0.1:8899";
 
     const RPC_URL: &str = "https://api.devnet.solana.com";
-    const RPC_ER_URL: &str = "https://devnet.magicblock.app/";
+    const RPC_ER_URL: &str = "https://devnet-eu.magicblock.app/";
     //
 
     // use std::os::macos::raw::stat;
@@ -38,6 +38,7 @@ mod er_tests {
     use solana_keypair::read_keypair_file;
     use solana_keypair::Keypair;
     // use solana_message::Message;
+    use solana_pubkey::pubkey;
     use solana_pubkey::Pubkey;
     use solana_rpc_client::rpc_client::RpcClient;
     use solana_sdk_ids::sysvar::rent::ID as RENT_ID;
@@ -58,6 +59,7 @@ mod er_tests {
         },
     };
 
+    pub const EU_VALIDATOR: Pubkey = pubkey!("MEUGGrYPxKk17hCr7wpT6s8dtNokZj5U2L57vjYMS8e");
     pub struct ReusableState {
         pub rpc_client: RpcClient,
         pub rpc_er_client: RpcClient,
@@ -80,7 +82,7 @@ mod er_tests {
         let payer = read_keypair_file("dev_wallet.json").expect("Couldn't find wallet file");
 
         // Derive the PDA for the escrow account using the maker's public key and a seed value
-        let combined = encode_packed!(b"bird", payer.pubkey().as_ref());
+        let combined = encode_packed!(b"birdie", payer.pubkey().as_ref());
         let account_to_create = Pubkey::find_program_address(
             &[&compute_hash(&combined), payer.pubkey().as_ref()],
             &PROGRAM_ID,
@@ -137,7 +139,7 @@ mod er_tests {
 
         let my_state_data = MyPosition { x: 24, y: 12 };
 
-        let combined = encode_packed!(b"bird", creator.pubkey().as_ref());
+        let combined = encode_packed!(b"birdie", creator.pubkey().as_ref());
         let digest = compute_hash(&combined);
 
         let mojo_data = crate::state::GenIxHandler {
@@ -202,7 +204,7 @@ mod er_tests {
 
         let my_state_data: MyPosition = MyPosition { x: 24, y: 12 };
 
-        let combined = encode_packed!(b"bird", creator.pubkey().as_ref());
+        let combined = encode_packed!(b"birdie", creator.pubkey().as_ref());
         let digest = compute_hash(&combined);
 
         let mojo_data = crate::state::GenIxHandler {
@@ -234,6 +236,7 @@ mod er_tests {
                 AccountMeta::new(delegation_metadata, false), // delegation metadata
                 AccountMeta::new(system_program, false), // system program
                 AccountMeta::new(delegation_program_id, false), // system program
+                AccountMeta::new(EU_VALIDATOR, false),   // a different Validator for speed
             ],
             data: delegate_ix_data,
         };
@@ -272,7 +275,7 @@ mod er_tests {
 
         let my_update_state_data: MyPosition = MyPosition { x: 24, y: 12 };
 
-        let combined = encode_packed!(b"bird", creator.pubkey().as_ref());
+        let combined = encode_packed!(b"birdie", creator.pubkey().as_ref());
         let digest = compute_hash(&combined);
 
         let mojo_data = crate::state::GenIxHandler {
@@ -344,7 +347,7 @@ mod er_tests {
         let buffer_account =
             Pubkey::find_program_address(&[BUFFER, creator_account.0.as_ref()], &PROGRAM_ID).0;
 
-        let combined = encode_packed!(b"bird", creator.pubkey().as_ref());
+        let combined = encode_packed!(b"birdie", creator.pubkey().as_ref());
         let digest = compute_hash(&combined);
 
         let mojo_data = crate::state::GenIxHandler {
@@ -419,7 +422,7 @@ mod er_tests {
         let creator_account = state.account_to_create;
         let my_update_state_data: MyPosition = MyPosition { x: 24, y: 12 };
 
-        let combined = encode_packed!(b"bird", creator.pubkey().as_ref());
+        let combined = encode_packed!(b"birdie", creator.pubkey().as_ref());
         let digest = compute_hash(&combined);
 
         let mojo_data = crate::state::GenIxHandler {
