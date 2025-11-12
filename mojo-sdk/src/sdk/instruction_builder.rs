@@ -1,8 +1,10 @@
 //! Instruction Builder utilities for underlying solana game engine program
 
 use crate::{
+    derive_pda,
     errors::MojoSDKError,
     types::{GenIxHandler, MojoInstructionDiscriminator},
+    utils::helpers::compute_hash,
 };
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},

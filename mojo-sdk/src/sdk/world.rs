@@ -2,40 +2,107 @@
 
 use crate::{
     errors::MojoSDKError, instruction_builder::UpdateDelegatedAccountBuilder, state::MojoState,
-    types::derive_pda, utils::helpers as utils,
+    types::derive_pda, utils::helpers as utils, GenIxHandler, MojoInstructionDiscriminator,
+    SdkClient,
 };
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{
+    instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
     signature::{Keypair, Signature},
     signer::Signer,
+    system_program::ID as system_program_id,
+    sysvar::ID as rent_id,
     transaction::Transaction,
 };
 use std::sync::Arc;
 
 /// Represents Mojo World which is seen as a container of states of the game
-#[derive(Clone)]
 pub struct World {
     /// The PDA of the game world
     pub world_pda: Pubkey,
-    /// RPC client
-    client: Arc<RpcClient>,
-    /// The Mojo program ID
-    program_id: Pubkey,
+    /// The Keypair of the world's creator, needed to sign for state changes.
+    pub creator_keypair: Keypair,
+    pub world_seed_hash: [u8; 32],
 }
 
 impl World {
     /// Create a new World instance
-    /// TODO: Later we shall abstract program_id away from user Dev
-    pub(crate) fn new(world_pda: Pubkey, client: Arc<RpcClient>, program_id: Pubkey) -> Self {
-        Self {
+
+    pub fn create_world<T: MojoState>(
+        client: &SdkClient,
+        creator: &Keypair,
+        world_name: &str,
+        initial_world_state: T,
+    ) -> Result<World, MojoSDKError> {
+        // Serialize the state data
+        let state_data = initial_world_state.serialize()?;
+
+        let mut combined_seeds = Vec::new();
+        combined_seeds.extend_from_slice(world_name.as_bytes());
+        combined_seeds.extend_from_slice(creator.pubkey().as_ref());
+
+        // Compute seed to hash bytes
+        let seed_bytes = utils::compute_hash(&combined_seeds);
+        // Derive the PDA
+        let (world_pda, _bump) = derive_pda(
+            &[&seed_bytes, creator.pubkey().as_ref()],
+            &client.program_id,
+        );
+
+        // 3. Prepare the instruction data
+        let account_size = state_data.len() as u64;
+        let mojo_data = GenIxHandler {
+            seeds: seed_bytes,
+            size: account_size.to_le_bytes(),
+        };
+
+        let instruction_data = [
+            vec![MojoInstructionDiscriminator::CreateAccount as u8], // Discriminator
+            bytemuck::bytes_of(&mojo_data).to_vec(),
+            state_data,
+        ]
+        .concat();
+
+        // 4. Build the instruction
+        let ix = Instruction {
+            program_id: client.program_id,
+            accounts: vec![
+                AccountMeta::new(creator.pubkey(), true),
+                AccountMeta::new(world_pda, false),
+                AccountMeta::new(system_program_id, false),
+                AccountMeta::new(rent_id, false),
+            ],
+            data: instruction_data,
+        };
+
+        // Create and send the transaction
+        let recent_blockhash = client
+            .client
+            .get_latest_blockhash()
+            .map_err(|e| MojoSDKError::SolanaClient(e))?;
+
+        let transaction = Transaction::new_signed_with_payer(
+            &[ix],
+            Some(&creator.pubkey()),
+            &[creator],
+            recent_blockhash,
+        );
+
+        // Send and confirm
+        let signature = client
+            .client
+            .send_and_confirm_transaction(&transaction)
+            .map_err(|e| MojoSDKError::TransactionFailed(e.to_string()))?;
+
+        Ok(World {
+            creator_keypair: Keypair::from_bytes(&creator.to_bytes()).unwrap(), // Simple clone
             world_pda,
-            client,
-            program_id,
-        }
+            world_seed_hash: seed_bytes,
+        })
     }
 
-    /// Write state to a delegated account (PDA)
+    /// Write state to a delegated account (PDA) on-chain
     ///
     /// # Arguments
     /// * `seed` - The seed string used to derive the PDA (e.g., "angry_bird")
@@ -47,39 +114,45 @@ impl World {
     /// # use mojo_sdk::{World, MojoState};
     /// # use solana_sdk::signature::Keypair;
     /// # fn example(world: World, owner: Keypair, state: impl MojoState) -> mojo_sdk::Result<()> {
-    /// world.write_state("my_state", &owner, state)?;
+    /// world.write_state(client, "my_state", &owner, state)?;
     /// # Ok(())
     /// # }
     /// ```
     pub fn write_state<T: MojoState>(
         &self,
-        seed: &Vec<u8>,
+        client: &SdkClient,
+        state_name: &str,
         owner: &Keypair,
         state: T,
     ) -> Result<Signature, MojoSDKError> {
         // Serialize the state data
         let state_data = state.serialize()?;
 
+        let mut combined_seeds = Vec::new();
+        combined_seeds.extend_from_slice(b"state");
+        combined_seeds.extend_from_slice(self.world_pda.as_ref());
+        combined_seeds.extend_from_slice(state_name.as_bytes());
+        combined_seeds.extend_from_slice(owner.pubkey().as_ref());
+
         // Compute seed to hash bytes
-        let seed_bytes = utils::compute_hash(seed);
+        let seed_bytes = utils::compute_hash(&combined_seeds);
 
         // Derive the PDA
         let (account_pda, _bump) =
-            derive_pda(&[&seed_bytes, owner.pubkey().as_ref()], &self.program_id);
+            derive_pda(&[&seed_bytes, owner.pubkey().as_ref()], &client.program_id);
 
         // Build the instruction
         let instruction = UpdateDelegatedAccountBuilder::new(
-            self.program_id,
+            client.program_id,
             owner.pubkey(),
             account_pda,
-            seed,
+            &combined_seeds,
             state_data,
         )
         .build()?;
 
         // Create and send the transaction
-        // TODO add this to utils
-        let recent_blockhash = self
+        let recent_blockhash = client
             .client
             .get_latest_blockhash()
             .map_err(|e| MojoSDKError::SolanaClient(e))?;
@@ -92,7 +165,7 @@ impl World {
         );
 
         // Send and confirm
-        let signature = self
+        let signature = client
             .client
             .send_and_confirm_transaction(&transaction)
             .map_err(|e| MojoSDKError::TransactionFailed(e.to_string()))?;

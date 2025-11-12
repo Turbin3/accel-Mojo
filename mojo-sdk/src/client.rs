@@ -1,15 +1,24 @@
 //! Main SDK client for interacting with the Mojo program
-
+//!
+use crate::{
+    errors::MojoSDKError, instruction_builder::UpdateDelegatedAccountBuilder, state::MojoState,
+    types::derive_pda, utils::helpers as utils, world::*,
+};
+use anyhow::Error;
 use solana_client::rpc_client::RpcClient;
-use solana_sdk::{pubkey, pubkey::Pubkey};
+use solana_sdk::{
+    pubkey,
+    pubkey::Pubkey,
+    signature::{Keypair, Signature},
+};
 use std::sync::Arc;
 
 const PROGRAM_ID: Pubkey = pubkey!("58sfdJaiSM7Ccr6nHNXXmwbfT6e9s8Zkee6zdRSH8CeS");
 
 /// Client Wrapper to interact with the Mojo Solana Program
 pub struct SdkClient {
-    client: Arc<RpcClient>,
-    program_id: Pubkey,
+    pub client: RpcClient,
+    pub program_id: Pubkey,
 }
 
 pub enum RpcType {
@@ -45,34 +54,64 @@ impl SdkClient {
     /// let client = SdkClient::new(RpcType::DEV);
     /// ```
     pub fn new(rpc_type: RpcType) -> Self {
-        let client = Arc::new(RpcClient::new(rpc_type.url()));
+        let client = RpcClient::new(rpc_type.url());
         let program_id = PROGRAM_ID;
         Self { client, program_id }
     }
 
-    // /// Create a new world
-    // ///
-    // /// # Arguments
-    // /// * `creator` - The keypair creating the world
-    // /// * `world_name` - Name/seed for the world
-    // /// * `initial_state` - Initial state data
-    // pub fn create_world<T: MojoState>(
-    //     &self,
-    //     creator: &Keypair,
-    //     world_name: &str,
-    //     initial_state: T,
-    // ) -> Result<World, MojoSDKError> {
-    //     // This would call the CreateAccount instruction in Solana Program
-    //     todo!("create_world implementation")
-    // }
-    //
-    // /// Get a reference to the RPC client
-    // pub fn client(&self) -> &RpcClient {
-    //     &self.client
-    // }
-    //
-    // /// Get the program ID
-    // pub fn program_id(&self) -> &Pubkey {
-    //     &self.program_id
-    // }
+    /// Create a new world
+    ///
+    /// # Arguments
+    /// * `creator` - The keypair creating the world
+    /// * `world_name` - Name/seed for the world
+    /// * `initial_state` - Initial state data
+    /// # Example
+    /// ```
+    /// use mojo_sdk::{SdkClient, RpcType};
+    /// use solana_sdk::pubkey;
+    ///
+    /// let client = SdkClient::new(RpcType::DEV);
+    /// let world = client.create_world(creator_keypair, "New World", Position{x:0, y:0});
+    pub fn create_world<T: MojoState>(
+        &self,
+        creator: &Keypair,
+        world_name: &str,
+        initial_world_state: T,
+    ) -> Result<World, MojoSDKError> {
+        World::create_world(&self, creator, world_name, initial_world_state)
+    }
+
+    /// Write state of world
+    ///
+    /// # Arguments
+    /// * `world` - The world object handle to be mutated on chain
+    /// * `state_name` - Name/seed for the state to be changed
+    /// * `owner` - The keypair of the world owner
+    /// * `state` - State data to be written
+    /// # Example
+    /// ```
+    /// use mojo_sdk::{SdkClient, RpcType};
+    /// use solana_sdk::pubkey;
+    ///
+    /// let client = SdkClient::new(RpcType::DEV);
+    /// let world = client.write_state(world, "my beast boxer", creator_keypair, Position{x:0, y:0});
+    pub fn write_state<T: MojoState>(
+        &self, // client
+        world: &World,
+        state_name: &str,
+        owner: &Keypair,
+        state: T,
+    ) -> Result<Signature, MojoSDKError> {
+        world.write_state(&self, state_name, owner, state)
+    }
+
+    /// Get a reference to the RPC client
+    pub fn client(&self) -> &RpcClient {
+        &self.client
+    }
+
+    /// Get the program ID
+    pub fn program_id(&self) -> &Pubkey {
+        &self.program_id
+    }
 }
