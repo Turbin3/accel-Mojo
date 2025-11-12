@@ -2,6 +2,36 @@
 
 This is the Solana Program which is an account factory for the Mojo-sdk written with Pinocchio, bytemuck, sha2.
 
+## Building the Program
+
+_🚨 it is expected that you have already set up your Solana cli_
+
+```bash
+ # enter the program directory
+cd mojo-program
+ # set environment to devnet
+solana config set --url devnet
+ # build an .so file to deploy
+cargo build-sbf
+```
+
+now make sure the address at `target/deploy/mojo_program-keypair.json` \
+ can be checked with
+
+```bash
+solana address -k target/deploy/mojo_program-keypair.json
+```
+
+is the same as what you have in your `pinocchio_pubkey::declare_id!("7iMdvW8A4Tw3yxjbXjpx4b8LTW13EQLB4eTmPyqRvxzM");` in `lib.rs` \
+if not, just paste up what's in the terminal from the last command into that string `pinocchio_pubkey::declare_id!("YourNewAddress111111111111111111111111111111");`
+
+save and deploy the program
+
+```bash
+ # deploy the program to devnet
+solana program deploy --program-id target/deploy/mojo_program-keypair.json target/deploy/mojo_program.so
+```
+
 ## Running the tests
 
 _🚨 it is expected that you have already set up your Solana cli_

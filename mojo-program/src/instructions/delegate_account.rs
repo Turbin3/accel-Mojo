@@ -34,7 +34,7 @@ pub fn process_delegate_account(
     // 5. [] the delegation metadata
     // 6. [] System Program + ...Other essential accounts...
 
-    let [creator, creator_account, owner_program, buffer_account, delegation_record, delegation_metadata, rest @ ..] =
+    let [creator, creator_account, owner_program, buffer_account, delegation_record, delegation_metadata, validator, rest @ ..] =
         accounts
     else {
         return Err(ProgramError::NotEnoughAccountKeys);
@@ -60,6 +60,7 @@ pub fn process_delegate_account(
 
     let config = DelegateConfig {
         commit_frequency_ms: 30000, // 30 seconds
+        validator: Some(*validator.key()),
         ..Default::default()
     };
 
