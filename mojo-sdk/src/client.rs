@@ -1,17 +1,10 @@
 //! Main SDK client for interacting with the Mojo program
 //!
-use crate::{
-    errors::MojoSDKError, instruction_builder::UpdateDelegatedAccountBuilder, state::MojoState,
-    types::derive_pda, utils::helpers as utils, world::*,
-};
-use anyhow::Error;
-use solana_client::rpc_client::RpcClient;
-use solana_sdk::{
-    pubkey,
-    pubkey::Pubkey,
-    signature::{Keypair, Signature},
-};
-use std::sync::Arc;
+use crate::{errors::MojoSDKError, state::MojoState, world::*};
+
+use solana_keypair::Keypair;
+use solana_pubkey::{pubkey, Pubkey};
+use solana_rpc_client::rpc_client::RpcClient;
 
 const PROGRAM_ID: Pubkey = pubkey!("58sfdJaiSM7Ccr6nHNXXmwbfT6e9s8Zkee6zdRSH8CeS");
 
@@ -25,7 +18,8 @@ pub enum RpcType {
     Main,
     Dev,
     ERMain,
-    ERDev,
+    MBDev, // MagicBlock Devnet
+    ERDev, // Ephemeral Rollup Devnet
 }
 
 impl RpcType {
@@ -34,7 +28,8 @@ impl RpcType {
             RpcType::Main => "https://api.mainnet-beta.solana.com",
             RpcType::Dev => "https://api.devnet.solana.com",
             RpcType::ERMain => "",
-            RpcType::ERDev => "",
+            RpcType::MBDev => "https://devnet-rpc.magicblock.app",
+            RpcType::ERDev => "https://devnet.magicblock.app",
         }
     }
 }
@@ -48,10 +43,10 @@ impl SdkClient {
     ///
     /// # Example
     /// ```
-    /// use mojo_sdk::{SdkClient, RpcType};
-    /// use solana_sdk::pubkey;
+    /// // use mojo_sdk::{SdkClient, RpcType};
+    /// // use solana_sdk::pubkey;
     ///
-    /// let client = SdkClient::new(RpcType::DEV);
+    /// // let client = SdkClient::new(RpcType::DEV);
     /// ```
     pub fn new(rpc_type: RpcType) -> Self {
         let client = RpcClient::new(rpc_type.url());
@@ -67,11 +62,11 @@ impl SdkClient {
     /// * `initial_state` - Initial state data
     /// # Example
     /// ```
-    /// use mojo_sdk::{SdkClient, RpcType};
-    /// use solana_sdk::pubkey;
+    /// // use mojo_sdk::{SdkClient, RpcType};
+    /// // use solana_sdk::pubkey;
     ///
-    /// let client = SdkClient::new(RpcType::DEV);
-    /// let world = client.create_world(creator_keypair, "New World", Position{x:0, y:0});
+    /// // let client = SdkClient::new(RpcType::DEV);
+    /// // let world = client.create_world(creator_keypair, "New World", Position{x:0, y:0});
     pub fn create_world<T: MojoState>(
         &self,
         creator: &Keypair,
@@ -90,18 +85,18 @@ impl SdkClient {
     /// * `state` - State data to be written
     /// # Example
     /// ```
-    /// use mojo_sdk::{SdkClient, RpcType};
-    /// use solana_sdk::pubkey;
+    /// // use mojo_sdk::{SdkClient, RpcType};
+    /// // use solana_sdk::pubkey;
     ///
-    /// let client = SdkClient::new(RpcType::DEV);
-    /// let world = client.write_state(world, "my beast boxer", creator_keypair, Position{x:0, y:0});
+    /// // let client = SdkClient::new(RpcType::DEV);
+    /// // let world = client.write_state(world, "my beast boxer", creator_keypair, Position{x:0, y:0});
     pub fn write_state<T: MojoState>(
         &self, // client
         world: &World,
         state_name: &str,
         owner: &Keypair,
         state: T,
-    ) -> Result<Signature, MojoSDKError> {
+    ) -> Result<(), MojoSDKError> {
         world.write_state(&self, state_name, owner, state)
     }
 

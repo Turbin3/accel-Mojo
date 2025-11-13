@@ -1,2 +1,4 @@
 # Should ignore target dir at any level
 target/
+
+dev_wallet.json

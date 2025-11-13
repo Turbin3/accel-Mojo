@@ -6,12 +6,10 @@ use crate::{
     types::{GenIxHandler, MojoInstructionDiscriminator},
     utils::helpers::compute_hash,
 };
-use solana_sdk::{
-    instruction::{AccountMeta, Instruction},
-    pubkey::Pubkey,
-    system_program::ID as system_program_id,
-    sysvar::rent::ID as rent_id,
-};
+use solana_instruction::{AccountMeta, Instruction};
+use solana_pubkey::Pubkey;
+use solana_system_program::id as system_program_id;
+use solana_sysvar::rent::ID as rent_id;
 
 /// Builder for update_delegated_account instruction
 pub struct UpdateDelegatedAccountBuilder {
@@ -54,7 +52,7 @@ impl UpdateDelegatedAccountBuilder {
         let accounts = vec![
             AccountMeta::new(self.creator, true), // creator (signer)
             AccountMeta::new(self.account_to_update, false), // account_to_update
-            AccountMeta::new(system_program_id, false),
+            AccountMeta::new(system_program_id(), false),
             AccountMeta::new(rent_id, false),
         ];
 

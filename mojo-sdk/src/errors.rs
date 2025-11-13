@@ -5,8 +5,8 @@ use thiserror::Error;
 /// Errors that can occur when using the Mojo SDK
 #[derive(Error, Debug)]
 pub enum MojoSDKError {
-    #[error("Solana client error: {0}")]
-    SolanaClient(#[from] solana_client::client_error::ClientError),
+    #[error("Solana client error: ")]
+    SolanaClient(),
 
     #[error("Solana SDK error: {0}")]
     SolanaSdk(String),

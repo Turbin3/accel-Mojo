@@ -1,7 +1,7 @@
 //! Common types that are used throughout the SDK to interact with the Solana Program
 
 use bytemuck::{Pod, Zeroable};
-use solana_sdk::pubkey::Pubkey;
+use solana_program::pubkey::Pubkey;
 
 use crate::utils::helpers as utils;
 

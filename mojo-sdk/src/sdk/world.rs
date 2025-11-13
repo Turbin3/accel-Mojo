@@ -5,17 +5,16 @@ use crate::{
     types::derive_pda, utils::helpers as utils, GenIxHandler, MojoInstructionDiscriminator,
     SdkClient,
 };
-use solana_client::rpc_client::RpcClient;
-use solana_sdk::{
-    instruction::{AccountMeta, Instruction},
-    pubkey::Pubkey,
-    signature::{Keypair, Signature},
-    signer::Signer,
-    system_program::ID as system_program_id,
-    sysvar::ID as rent_id,
-    transaction::Transaction,
-};
-use std::sync::Arc;
+
+use solana_instruction::{AccountMeta, Instruction};
+use solana_keypair::Keypair;
+use solana_message::Message;
+use solana_pubkey::Pubkey;
+use solana_rpc_client::rpc_client::RpcClient;
+use solana_signer::Signer;
+use solana_system_program::id as system_program_id;
+use solana_sysvar::rent::ID as rent_id;
+use solana_transaction::Transaction;
 
 /// Represents Mojo World which is seen as a container of states of the game
 pub struct World {
@@ -70,27 +69,24 @@ impl World {
             accounts: vec![
                 AccountMeta::new(creator.pubkey(), true),
                 AccountMeta::new(world_pda, false),
-                AccountMeta::new(system_program_id, false),
+                AccountMeta::new(system_program_id(), false),
                 AccountMeta::new(rent_id, false),
             ],
             data: instruction_data,
         };
 
+        let message = Message::new(&[ix], Some(&creator.pubkey()));
+
         // Create and send the transaction
         let recent_blockhash = client
             .client
             .get_latest_blockhash()
-            .map_err(|e| MojoSDKError::SolanaClient(e))?;
+            .map_err(|_e| MojoSDKError::SolanaClient())?;
 
-        let transaction = Transaction::new_signed_with_payer(
-            &[ix],
-            Some(&creator.pubkey()),
-            &[creator],
-            recent_blockhash,
-        );
+        let transaction = Transaction::new(&[creator], message, recent_blockhash);
 
         // Send and confirm
-        let signature = client
+        client
             .client
             .send_and_confirm_transaction(&transaction)
             .map_err(|e| MojoSDKError::TransactionFailed(e.to_string()))?;
@@ -111,12 +107,13 @@ impl World {
     ///
     /// # Example
     /// ```no_run
-    /// # use mojo_sdk::{World, MojoState};
-    /// # use solana_sdk::signature::Keypair;
-    /// # fn example(world: World, owner: Keypair, state: impl MojoState) -> mojo_sdk::Result<()> {
-    /// world.write_state(client, "my_state", &owner, state)?;
-    /// # Ok(())
-    /// # }
+    /// // use mojo_sdk::{World, MojoState};
+    /// // use solana_sdk::signature::Keypair;
+    /// // fn example(world: World, owner: Keypair, state: impl MojoState) -> Result<(),
+    /// // MojoSDKError> {
+    /// // world.write_state(client, "my_state", &owner, state)?;
+    /// // Ok(())
+    /// // }
     /// ```
     pub fn write_state<T: MojoState>(
         &self,
@@ -124,7 +121,7 @@ impl World {
         state_name: &str,
         owner: &Keypair,
         state: T,
-    ) -> Result<Signature, MojoSDKError> {
+    ) -> Result<(), MojoSDKError> {
         // Serialize the state data
         let state_data = state.serialize()?;
 
@@ -151,27 +148,24 @@ impl World {
         )
         .build()?;
 
+        let message = Message::new(&[instruction], Some(&owner.pubkey()));
+
         // Create and send the transaction
         let recent_blockhash = client
             .client
             .get_latest_blockhash()
-            .map_err(|e| MojoSDKError::SolanaClient(e))?;
+            .map_err(|_e| MojoSDKError::SolanaClient())?;
 
-        let transaction = Transaction::new_signed_with_payer(
-            &[instruction],
-            Some(&owner.pubkey()),
-            &[owner],
-            recent_blockhash,
-        );
+        let transaction = Transaction::new(&[owner], message, recent_blockhash);
 
         // Send and confirm
-        let signature = client
+        client
             .client
             .send_and_confirm_transaction(&transaction)
             .map_err(|e| MojoSDKError::TransactionFailed(e.to_string()))?;
 
         // log::info!("✅ State updated successfully. Signature: {}", signature);
 
-        Ok(signature)
+        Ok(())
     }
 }
