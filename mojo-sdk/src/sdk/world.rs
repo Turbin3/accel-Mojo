@@ -92,7 +92,10 @@ impl World {
             .map_err(|e| MojoSDKError::TransactionFailed(e.to_string()))?;
 
         Ok(World {
-            creator_keypair: Keypair::from_bytes(&creator.to_bytes()).unwrap(), // Simple clone
+            creator_keypair: Keypair::from_bytes(&creator.to_bytes()).unwrap(), // Simple clone //
+            // TODO: This
+            // should not be
+            // exposed
             world_pda,
             world_seed_hash: seed_bytes,
         })
@@ -132,6 +135,7 @@ impl World {
         combined_seeds.extend_from_slice(owner.pubkey().as_ref());
 
         // Compute seed to hash bytes
+        // FIXME:   Fix how seeds are constructed according to program
         let seed_bytes = utils::compute_hash(&combined_seeds);
 
         // Derive the PDA

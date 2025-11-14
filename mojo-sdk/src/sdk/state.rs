@@ -25,15 +25,18 @@ pub trait MojoState: Sized {
 macro_rules! impl_mojo_state_pod {
     ($type:ty) => {
         impl $crate::MojoState for $type {
-            fn serialize(&self) -> $crate::Result<Vec<u8>> {
+            fn serialize(&self) -> Result<Vec<u8>, $crate::errors::MojoSDKError> {
                 Ok(bytemuck::bytes_of(self).to_vec())
             }
 
-            fn deserialize(data: &[u8]) -> $crate::Result<Self> {
+            fn deserialize(data: &[u8]) -> Result<Self, $crate::errors::MojoSDKError> {
                 bytemuck::try_from_bytes(data)
                     .map(|p: &Self| *p)
                     .map_err(|e| {
-                        $crate::MojoError::Deserialization(format!("Failed to deserialize: {}", e))
+                        $crate::MojoSDKError::Deserialization(format!(
+                            "Failed to deserialize: {}",
+                            e
+                        ))
                     })
             }
         }

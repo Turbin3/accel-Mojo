@@ -1,7 +1,6 @@
 extern crate alloc;
 use alloc::vec::Vec;
 
-#[cfg(test)]
 pub mod helpers {
 
     use sha2::{Digest, Sha256};

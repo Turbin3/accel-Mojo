@@ -6,7 +6,7 @@ use solana_keypair::Keypair;
 use solana_pubkey::{pubkey, Pubkey};
 use solana_rpc_client::rpc_client::RpcClient;
 
-const PROGRAM_ID: Pubkey = pubkey!("58sfdJaiSM7Ccr6nHNXXmwbfT6e9s8Zkee6zdRSH8CeS");
+const PROGRAM_ID: Pubkey = pubkey!("57DTMgVYppP35GGWfcu9s2jtLo6afryGDEcrMYHoEhKn");
 
 /// Client Wrapper to interact with the Mojo Solana Program
 pub struct SdkClient {
@@ -20,6 +20,7 @@ pub enum RpcType {
     ERMain,
     MBDev, // MagicBlock Devnet
     ERDev, // Ephemeral Rollup Devnet
+    Surf,  // Localnet surfpool
 }
 
 impl RpcType {
@@ -30,6 +31,7 @@ impl RpcType {
             RpcType::ERMain => "",
             RpcType::MBDev => "https://devnet-rpc.magicblock.app",
             RpcType::ERDev => "https://devnet.magicblock.app",
+            RpcType::Surf => "http://127.0.0.1:8899",
         }
     }
 }
