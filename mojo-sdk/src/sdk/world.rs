@@ -37,17 +37,14 @@ impl World {
         // Serialize the state data
         let state_data = initial_world_state.serialize()?;
 
-        let mut combined_seeds = Vec::new();
-        combined_seeds.extend_from_slice(world_name.as_bytes());
-        combined_seeds.extend_from_slice(creator.pubkey().as_ref());
+        let creator_pubkey = creator.pubkey();
+        let world_seed_input = Self::world_seed_input(world_name, &creator_pubkey);
 
         // Compute seed to hash bytes
-        let seed_bytes = utils::compute_hash(&combined_seeds);
+        let seed_bytes = utils::compute_hash(&world_seed_input);
         // Derive the PDA
-        let (world_pda, _bump) = derive_pda(
-            &[&seed_bytes, creator.pubkey().as_ref()],
-            &client.program_id,
-        );
+        let (world_pda, _bump) =
+            derive_pda(&[&seed_bytes, creator_pubkey.as_ref()], &client.program_id);
 
         // 3. Prepare the instruction data
         let account_size = state_data.len() as u64;
@@ -67,7 +64,7 @@ impl World {
         let ix = Instruction {
             program_id: client.program_id,
             accounts: vec![
-                AccountMeta::new(creator.pubkey(), true),
+                AccountMeta::new(creator_pubkey, true),
                 AccountMeta::new(world_pda, false),
                 AccountMeta::new(system_program_id(), false),
                 AccountMeta::new(rent_id, false),
@@ -75,7 +72,7 @@ impl World {
             data: instruction_data,
         };
 
-        let message = Message::new(&[ix], Some(&creator.pubkey()));
+        let message = Message::new(&[ix], Some(&creator_pubkey));
 
         // Create and send the transaction
         let recent_blockhash = client
@@ -128,31 +125,25 @@ impl World {
         // Serialize the state data
         let state_data = state.serialize()?;
 
-        let mut combined_seeds = Vec::new();
-        combined_seeds.extend_from_slice(b"state");
-        combined_seeds.extend_from_slice(self.world_pda.as_ref());
-        combined_seeds.extend_from_slice(state_name.as_bytes());
-        combined_seeds.extend_from_slice(owner.pubkey().as_ref());
-
-        // Compute seed to hash bytes
-        // FIXME:   Fix how seeds are constructed according to program
-        let seed_bytes = utils::compute_hash(&combined_seeds);
+        let owner_pubkey = owner.pubkey();
+        let state_seed_input = self.state_seed_input(state_name, &owner_pubkey);
+        let seed_bytes = utils::compute_hash(&state_seed_input);
 
         // Derive the PDA
         let (account_pda, _bump) =
-            derive_pda(&[&seed_bytes, owner.pubkey().as_ref()], &client.program_id);
+            derive_pda(&[&seed_bytes, owner_pubkey.as_ref()], &client.program_id);
 
         // Build the instruction
         let instruction = UpdateDelegatedAccountBuilder::new(
             client.program_id,
-            owner.pubkey(),
+            owner_pubkey,
             account_pda,
-            &combined_seeds,
+            &state_seed_input,
             state_data,
         )
         .build()?;
 
-        let message = Message::new(&[instruction], Some(&owner.pubkey()));
+        let message = Message::new(&[instruction], Some(&owner_pubkey));
 
         // Create and send the transaction
         let recent_blockhash = client
@@ -171,5 +162,18 @@ impl World {
         // log::info!("✅ State updated successfully. Signature: {}", signature);
 
         Ok(())
+    }
+
+    fn world_seed_input(world_name: &str, creator: &Pubkey) -> Vec<u8> {
+        crate::encode_packed!(b"world", world_name.as_bytes(), creator.as_ref())
+    }
+
+    fn state_seed_input(&self, state_name: &str, owner: &Pubkey) -> Vec<u8> {
+        crate::encode_packed!(
+            b"state",
+            self.world_seed_hash.as_ref(),
+            state_name.as_bytes(),
+            owner.as_ref()
+        )
     }
 }
