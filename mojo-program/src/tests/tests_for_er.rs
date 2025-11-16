@@ -126,7 +126,7 @@ mod er_tests {
             delegation_record,
         };
 
-        (reusable_state)
+        reusable_state
     }
 
     #[test]
@@ -150,7 +150,7 @@ mod er_tests {
         let create_ix_data = [
             vec![crate::instructions::MojoInstructions::CreateAccount as u8],
             mojo_data.to_bytes(),
-            my_state_data.to_bytes(),
+            // my_state_data.to_bytes(),
         ]
         .concat();
 
@@ -185,11 +185,14 @@ mod er_tests {
             "Success! Check out your TX here:\nhttps://explorer.solana.com/tx/{}/?cluster=devnet",
             signature
         );
+
+
     }
 
     #[test]
     fn test_delegate_state_account() {
         let mut state = setup();
+        // let mut state_two = create_ingridients();
 
         let creator = state.creator;
         let creator_account = state.account_to_create;
@@ -197,6 +200,8 @@ mod er_tests {
         let delegation_record = state.delegation_record;
         let delegation_metadata = state.delegation_metadata;
         let system_program = state.system_program;
+        let delegate_id = Pubkey::new_from_array(DELEGATION_PROGRAM_ID);
+
 
         // Derive the buffer PDA using [BUFFER, creator_account] with our PROGRAM_ID
         let buffer_account =
@@ -212,11 +217,14 @@ mod er_tests {
             size: my_state_data.length().to_le_bytes(),
         };
 
+        // let mojo_data = state_two.data
+
         // const MAX_LEN: usize = 128;
 
         let delegate_ix_data = [
             vec![crate::instructions::MojoInstructions::DelegateAccount as u8],
             mojo_data.to_bytes(),
+            my_state_data.to_bytes(),
         ]
         .concat();
 
@@ -235,7 +243,7 @@ mod er_tests {
                 AccountMeta::new(delegation_record, false), // delegation record
                 AccountMeta::new(delegation_metadata, false), // delegation metadata
                 AccountMeta::new(system_program, false), // system program
-                AccountMeta::new(delegation_program_id, false), // system program
+                AccountMeta::new(delegate_id, false), // system program
                 AccountMeta::new(EU_VALIDATOR, false),   // a different Validator for speed
             ],
             data: delegate_ix_data,
@@ -399,7 +407,7 @@ mod er_tests {
 
         let transaction = Transaction::new_signed_with_payer(
             &[commit_ix],
-            Some((&creator.pubkey())),
+            Some(&creator.pubkey()),
             &[&creator],
             recent_blockhash,
         );
@@ -414,7 +422,7 @@ mod er_tests {
         );
     }
 
-    // #[test]
+    #[test]
     fn test_commit_and_undelegate_account() {
         let mut state = setup();
 
@@ -435,6 +443,7 @@ mod er_tests {
         let undelegate_ix_data = [
             vec![crate::instructions::MojoInstructions::UndelegateAccount as u8],
             mojo_data.to_bytes(),
+            my_update_state_data.to_bytes(),
         ]
         .concat();
 

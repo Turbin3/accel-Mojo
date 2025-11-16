@@ -9,6 +9,7 @@ mod tests;
 
 entrypoint!(process_instruction);
 pinocchio_pubkey::declare_id!("7iMdvW8A4Tw3yxjbXjpx4b8LTW13EQLB4eTmPyqRvxzM");
+// pinocchio_pubkey::declare_id!("BukWKLVVs5Mj1qs2WJ8TT78BvBaA3wZy8WcRfQxMLCFZ");
 
 use pinocchio_log::log;
 

@@ -71,6 +71,7 @@ pub fn process_delegate_account(
         buffer_account,
         delegation_record,
         delegation_metadata,
+        validator
     ];
 
     delegate_account(&delegate_accounts, seeds, bump, config)?;
