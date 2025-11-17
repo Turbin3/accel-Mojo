@@ -126,12 +126,8 @@ impl World {
         let state_data = state.serialize()?;
 
         let owner_pubkey = owner.pubkey();
-        let state_seed_input = self.state_seed_input(state_name, &owner_pubkey);
-        let seed_bytes = utils::compute_hash(&state_seed_input);
-
-        // Derive the PDA
-        let (account_pda, _bump) =
-            derive_pda(&[&seed_bytes, owner_pubkey.as_ref()], &client.program_id);
+        let (account_pda, state_seed_input, _seed_hash) =
+            self.derive_state_pda(state_name, &owner_pubkey, client);
 
         // Build the instruction
         let instruction = UpdateDelegatedAccountBuilder::new(
@@ -164,16 +160,62 @@ impl World {
         Ok(())
     }
 
+    /// Read the current state stored in a delegated account
+    pub fn read_delegated_state<T: MojoState>(
+        &self,
+        client: &SdkClient,
+        state_name: &str,
+        owner: &Pubkey,
+    ) -> Result<T, MojoSDKError> {
+        let (account_pda, _seed_input, _seed_hash) =
+            self.derive_state_pda(state_name, owner, client);
+        let account_data = Self::fetch_owned_account_data(client, &account_pda)?;
+        T::deserialize(&account_data)
+    }
+
+    /// Read the data stored in the world PDA itself
+    pub fn read_world_state<T: MojoState>(&self, client: &SdkClient) -> Result<T, MojoSDKError> {
+        let account_data = Self::fetch_owned_account_data(client, &self.world_pda)?;
+        T::deserialize(&account_data)
+    }
+
     fn world_seed_input(world_name: &str, creator: &Pubkey) -> Vec<u8> {
         crate::encode_packed!(b"world", world_name.as_bytes(), creator.as_ref())
     }
 
-    fn state_seed_input(&self, state_name: &str, owner: &Pubkey) -> Vec<u8> {
-        crate::encode_packed!(
+    fn derive_state_pda(
+        &self,
+        state_name: &str,
+        owner: &Pubkey,
+        client: &SdkClient,
+    ) -> (Pubkey, Vec<u8>, [u8; 32]) {
+        let seed_input = crate::encode_packed!(
             b"state",
             self.world_seed_hash.as_ref(),
             state_name.as_bytes(),
             owner.as_ref()
-        )
+        );
+        let seed_hash = utils::compute_hash(&seed_input);
+        let (pda, _bump) = derive_pda(&[&seed_hash, owner.as_ref()], &client.program_id);
+        (pda, seed_input, seed_hash)
+    }
+
+    fn fetch_owned_account_data(
+        client: &SdkClient,
+        account: &Pubkey,
+    ) -> Result<Vec<u8>, MojoSDKError> {
+        let acc = client
+            .client
+            .get_account(account)
+            .map_err(|e| MojoSDKError::AccountNotFound(format!("{}: {}", account, e)))?;
+
+        if acc.owner != client.program_id {
+            return Err(MojoSDKError::InvalidAccountOwner(format!(
+                "expected {}, got {}",
+                client.program_id, acc.owner
+            )));
+        }
+
+        Ok(acc.data)
     }
 }

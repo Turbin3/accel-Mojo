@@ -6,7 +6,7 @@ use solana_keypair::Keypair;
 use solana_pubkey::{pubkey, Pubkey};
 use solana_rpc_client::rpc_client::RpcClient;
 
-const PROGRAM_ID: Pubkey = pubkey!("57DTMgVYppP35GGWfcu9s2jtLo6afryGDEcrMYHoEhKn");
+const PROGRAM_ID: Pubkey = pubkey!("7iMdvW8A4Tw3yxjbXjpx4b8LTW13EQLB4eTmPyqRvxzM");
 
 /// Client Wrapper to interact with the Mojo Solana Program
 pub struct SdkClient {
@@ -100,6 +100,21 @@ impl SdkClient {
         state: T,
     ) -> Result<(), MojoSDKError> {
         world.write_state(&self, state_name, owner, state)
+    }
+
+    /// Read the data stored in the world's PDA
+    pub fn read_world<T: MojoState>(&self, world: &World) -> Result<T, MojoSDKError> {
+        world.read_world_state(self)
+    }
+
+    /// Read a delegated state PDA owned by `owner`
+    pub fn read_delegated_state<T: MojoState>(
+        &self,
+        world: &World,
+        state_name: &str,
+        owner: &Pubkey,
+    ) -> Result<T, MojoSDKError> {
+        world.read_delegated_state(self, state_name, owner)
     }
 
     /// Get a reference to the RPC client

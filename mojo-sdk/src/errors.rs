@@ -29,6 +29,9 @@ pub enum MojoSDKError {
     #[error("Invalid state data: {0}")]
     InvalidStateData(String),
 
+    #[error("Account owned by different program: {0}")]
+    InvalidAccountOwner(String),
+
     #[error("Transaction failed: {0}")]
     TransactionFailed(String),
 
