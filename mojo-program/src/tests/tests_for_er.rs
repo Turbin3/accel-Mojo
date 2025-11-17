@@ -32,6 +32,13 @@ mod er_tests {
     // use std::os::macos::raw::stat;
 
     use super::*;
+    use ephemeral_rollups_pinocchio::consts::COMMIT_RECORD;
+    use ephemeral_rollups_pinocchio::consts::MAGIC_PROGRAM_ID;
+    use ephemeral_rollups_pinocchio::pda::commit_state_pda_from_delegated_account;
+    use ephemeral_rollups_pinocchio::pda::fees_vault_pda;
+    use ephemeral_rollups_pinocchio::pda::undelegate_buffer_pda_from_delegated_account;
+    use ephemeral_rollups_pinocchio::pda::validator_fees_vault_pda_from_validator;
+    use pinocchio::program_error::ProgramError;
     use pinocchio_log::log;
     // use solana_hash::Hash;
     use solana_instruction::{AccountMeta, Instruction};
@@ -66,13 +73,15 @@ mod er_tests {
         pub system_program: Pubkey,
         pub account_to_create: (Pubkey, u8),
         pub creator: Keypair,
-        pub creator_2: Option<Keypair>,
+        pub program_payer: Keypair,
         pub account_to_create2: Option<(Pubkey, u8)>,
         pub creator_account: Pubkey,
         pub owner_program: Pubkey,
         pub buffer_account: Pubkey,
         pub delegation_record: Pubkey,
         pub delegation_metadata: Pubkey,
+        pub commit_state_account: Pubkey,
+        pub commit_state_record: Pubkey,
     }
 
     fn setup() -> ReusableState {
@@ -80,6 +89,7 @@ mod er_tests {
         let rpc_er_client = RpcClient::new(RPC_ER_URL);
 
         let payer = read_keypair_file("dev_wallet.json").expect("Couldn't find wallet file");
+        let program_payer = read_keypair_file("/home/eaa/accel_builders/mojo-2/mojo-program/target/deploy/mojo_program-keypair.json").expect("Couldn't find wallet file");
 
         // Derive the PDA for the escrow account using the maker's public key and a seed value
         let combined = encode_packed!(b"birdie", payer.pubkey().as_ref());
@@ -106,6 +116,16 @@ mod er_tests {
             &delegation_program_id,
         )
         .0;
+        
+        let commit_state_account = Pubkey::find_program_address(
+            &[b"commit-state-account", account_to_create.0.as_ref()],
+            &delegation_program_id
+        ).0;
+        
+        let commit_state_record = Pubkey::find_program_address(
+            &[b"commit-state-record", account_to_create.0.as_ref()],
+            &delegation_program_id
+        ).0;
 
         // Derive the buffer PDA using [BUFFER, creator_account] with our PROGRAM_ID
         let buffer_account =
@@ -118,12 +138,14 @@ mod er_tests {
             account_to_create,
             creator: payer,
             account_to_create2: None,
-            creator_2: None,
+            program_payer: program_payer,
             creator_account,
             owner_program: PROGRAM_ID,
             buffer_account,
             delegation_metadata,
             delegation_record,
+            commit_state_account,
+            commit_state_record
         };
 
         reusable_state
@@ -134,6 +156,7 @@ mod er_tests {
         let mut state = setup();
 
         let creator = state.creator;
+        let program_payer = state.program_payer;
         let account_to_create = state.account_to_create;
         let system_program = state.system_program;
 
@@ -150,7 +173,7 @@ mod er_tests {
         let create_ix_data = [
             vec![crate::instructions::MojoInstructions::CreateAccount as u8],
             mojo_data.to_bytes(),
-            // my_state_data.to_bytes(),
+            my_state_data.to_bytes(), // this was the source of my problems. I added it back and the code worked out.
         ]
         .concat();
 
@@ -172,10 +195,11 @@ mod er_tests {
 
         let transaction = Transaction::new_signed_with_payer(
             &[instruction],
-            Some((&creator.pubkey())),
+            Some(&creator.pubkey()),
             &[&creator],
             recent_blockhash,
         );
+        
 
         let signature = state
             .rpc_client
@@ -228,7 +252,7 @@ mod er_tests {
         ]
         .concat();
 
-        let delegation_program_id = Pubkey::new_from_array(DELEGATION_PROGRAM_ID);
+        // let delegation_program_id = Pubkey::new_from_array(DELEGATION_PROGRAM_ID);
 
         let recent_blockhash = state.rpc_client.get_latest_blockhash().unwrap();
         // .expect("failed to get recent blockhash");
@@ -345,15 +369,18 @@ mod er_tests {
         let creator = state.creator;
         let creator_account = state.account_to_create;
         let owner_program = state.owner_program;
-        let delegation_record = state.delegation_record;
-        let delegation_metadata = state.delegation_metadata;
-        let system_program = state.system_program;
+        let program_payer = state.program_payer;
+        // let delegation_record = state.delegation_record;
+        // let delegation_metadata = state.delegation_metadata;
+        // let system_program = state.system_program;
+        // let commit_state = state.commit_state_account;
+        // let commit_record = state.commit_state_record;
 
         let my_update_state_data: MyPosition = MyPosition { x: 24, y: 12 };
 
         // Derive the buffer PDA using [BUFFER, creator_account] with our PROGRAM_ID
-        let buffer_account =
-            Pubkey::find_program_address(&[BUFFER, creator_account.0.as_ref()], &PROGRAM_ID).0;
+        // let buffer_account =
+        //     Pubkey::find_program_address(&[BUFFER, creator_account.0.as_ref()], &PROGRAM_ID).0;
 
         let combined = encode_packed!(b"birdie", creator.pubkey().as_ref());
         let digest = compute_hash(&combined);
@@ -370,39 +397,31 @@ mod er_tests {
         ]
         .concat();
 
+        // let fees_vault = validator_fees_vault_pda_from_validator(EU_VALIDATOR.as_array());
+
         let recent_blockhash = state
             .rpc_er_client
             .get_latest_blockhash()
             .expect("failed to get recent blockhash");
 
-        let delegation_program_id = Pubkey::new_from_array(DELEGATION_PROGRAM_ID);
+        // let delegation_program_id = Pubkey::new_from_array(DELEGATION_PROGRAM_ID);
 
+        // ephemeral_rollups_pinocchio::pda::
         // log!("{}", creator.pubkey());
         let commit_ix = Instruction {
-            program_id: state.owner_program,
+            // program_id: Pubkey::new_from_array(MAGIC_PROGRAM_ID),
+            program_id: PROGRAM_ID,
             accounts: vec![
+                // AccountMeta::new(program_payer.pubkey(), true),
                 AccountMeta::new(creator.pubkey(), true),
                 AccountMeta::new(creator_account.0, false),
-                // AccountMeta::new(creator_account.0, false),
-                // AccountMeta::new(system_program, false),
-                // AccountMeta::new((RENT_ID), false),
-                AccountMeta::new(
-                    Pubkey::new_from_array(ephemeral_rollups_pinocchio::consts::MAGIC_CONTEXT_ID),
-                    false,
-                ),
-                AccountMeta::new_readonly(
-                    Pubkey::new_from_array(ephemeral_rollups_pinocchio::consts::MAGIC_PROGRAM_ID),
-                    false,
-                ),
-                // AccountMeta::new_readonly(owner_program, false), // owner program
-                // AccountMeta::new_readonly(buffer_account, false), // buffer PDA (created via invoke_signed)
-                // AccountMeta::new_readonly(delegation_record, false), // delegation record
-                // AccountMeta::new_readonly(delegation_metadata, false), // delegation metadata
-                // AccountMeta::new_readonly(system_program, false), // system program
-                AccountMeta::new_readonly(delegation_program_id, false), // system program
-                                                                         // AccountMeta::new_readonly(state.system_program, false), // system program
+                AccountMeta::new_readonly(Pubkey::new_from_array(MAGIC_CONTEXT_ID), false),
+                AccountMeta::new_readonly(Pubkey::new_from_array(MAGIC_PROGRAM_ID), false),
+                // AccountMeta::new(state.owner_program, true),
+                // AccountMeta::new_readonly(Pubkey::new_from_array(MAGIC_PROGRAM_ID), false),
             ],
-            data: commit_ix_data,
+            data: vec![1, 0, 0, 0],  // ALLOW_UNDELEGATION_DATA
+            // data: commit_ix_data,
         };
 
         let transaction = Transaction::new_signed_with_payer(
@@ -427,8 +446,20 @@ mod er_tests {
         let mut state = setup();
 
         let creator = state.creator;
+        log!("this passed");
         let creator_account = state.account_to_create;
         let my_update_state_data: MyPosition = MyPosition { x: 24, y: 12 };
+        let owner_program = state.owner_program;
+        let delegation_record = state.delegation_record;
+        let delegation_metadata = state.delegation_metadata;
+        let system_program = state.system_program;
+        log!("this passed 2");
+        
+         let undelegate_buffer_account =
+            Pubkey::find_program_address(&[BUFFER, creator_account.0.as_ref()], &PROGRAM_ID).0;
+
+        let commit_state = state.commit_state_account;
+        let commit_record = state.commit_state_record;
 
         let combined = encode_packed!(b"birdie", creator.pubkey().as_ref());
         let digest = compute_hash(&combined);
@@ -437,51 +468,80 @@ mod er_tests {
             seeds: digest,
             size: my_update_state_data.length().to_le_bytes(),
         };
+        log!("this passed 3");
+
 
         // const MAX_LEN: usize = 128;
+        // let buffer_account =
+        //     Pubkey::find_program_address(&[BUFFER, creator_account.0.as_ref()], &PROGRAM_ID).0;
 
-        let undelegate_ix_data = [
-            vec![crate::instructions::MojoInstructions::UndelegateAccount as u8],
-            mojo_data.to_bytes(),
-            my_update_state_data.to_bytes(),
-        ]
-        .concat();
+        log!("this passed  here");
 
+        // let validator_bytes = EU_VALIDATOR.to_bytes();
+        // let fees_vault = validator_fees_vault_pda_from_validator(&validator_bytes);
+        // let fees_vault = validator_fees_vault_pda_from_validator(EU_VALIDATOR.as_ref());
+
+        log!("this passed 4 ");
+
+        //let undelegate_buffer = undelegate_buffer_pda_from_delegated_account(&creator_account.0.as_array());
+        // let undelegate_ix_data = [
+        //     vec![crate::instructions::MojoInstructions::UndelegateAccount as u8],
+        //     mojo_data.to_bytes(),
+        //     my_update_state_data.to_bytes(),
+        // ].concat();
+        
+        // The delegation program's commit_and_undelegate discriminator
+        let undelegate_ix_data = vec![2, 0, 0, 0];
+        log!("this passed nooooo");
+
+
+        let normal_fee = pubkey!("7JrkjmZPprHwtuvtuGTXp9hwfGYFAQLnLeFM52kqAgXg");
+        let validator_fee = pubkey!("7EUuuQDZRKar7dUESDynEEKkXity3TeqGdq1TNqefaAn");
         let recent_blockhash = state
-            .rpc_er_client
+            .rpc_client
             .get_latest_blockhash()
             .expect("failed to get recent blockhash");
 
         // log!("{}", creator.pubkey());
         let undelegate_ix = Instruction {
-            program_id: state.owner_program,
+            // program_id: state.owner_program,
+            // program_id: Pubkey::new_from_array(DELEGATION_PROGRAM_ID),
+            program_id: Pubkey::new_from_array(MAGIC_PROGRAM_ID),
             accounts: vec![
                 AccountMeta::new(creator.pubkey(), true),
-                AccountMeta::new(creator_account.0, false),
-                // AccountMeta::new(creator_account.0, false),
-                // AccountMeta::new(system_program, false),
-                // AccountMeta::new((RENT_ID), false),
-                AccountMeta::new_readonly(
-                    Pubkey::new_from_array(ephemeral_rollups_pinocchio::consts::MAGIC_CONTEXT_ID),
-                    false,
-                ),
-                AccountMeta::new_readonly(
-                    Pubkey::new_from_array(ephemeral_rollups_pinocchio::consts::MAGIC_PROGRAM_ID),
-                    false,
-                ),
+                AccountMeta::new(Pubkey::new_from_array(ephemeral_rollups_pinocchio::consts::MAGIC_CONTEXT_ID), false),  // magic context
+                AccountMeta::new(creator_account.0, false),  // delegated account 1
+
+                // AccountMeta::new_readonly(owner_program, false),
+                AccountMeta::new(undelegate_buffer_account, false),
+                // AccountMeta::new(EU_VALIDATOR, true),
+                // AccountMeta::new(creator.pubkey(), true),
+                AccountMeta::new(commit_state, false),
+                AccountMeta::new(commit_record, false),
+                AccountMeta::new(delegation_record, false),
+                AccountMeta::new(delegation_metadata, false),
+                AccountMeta::new(EU_VALIDATOR, false),
+                AccountMeta::new(normal_fee, false),
+                AccountMeta::new(validator_fee, false),
+                AccountMeta::new_readonly(system_program, false),
+                // AccountMeta::new_readonly(Pubkey::new_from_array(ephemeral_rollups_pinocchio::consts::MAGIC_CONTEXT_ID),false,),
+                // AccountMeta::new_readonly(Pubkey::new_from_array(ephemeral_rollups_pinocchio::consts::MAGIC_PROGRAM_ID),false,),
+                
             ],
-            data: undelegate_ix_data,
+            data: vec![2, 0, 0, 0],  // ALLOW_UNDELEGATION_DATA
+            // data: undelegate_ix_data,
         };
+
 
         let transaction = Transaction::new_signed_with_payer(
             &[undelegate_ix],
-            Some((&creator.pubkey())),
+            Some(&creator.pubkey()),
             &[&creator],
             recent_blockhash,
         );
 
         let signature = state
-            .rpc_er_client
+            .rpc_client
             .send_and_confirm_transaction(&transaction)
             .expect("failed to send txn");
         println!(
