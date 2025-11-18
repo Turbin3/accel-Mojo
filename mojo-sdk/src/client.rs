@@ -1,19 +1,12 @@
 //! Main SDK client for interacting with the Mojo program
 //!
-use crate::{
-    errors::MojoSDKError, instruction_builder::UpdateDelegatedAccountBuilder, state::MojoState,
-    types::derive_pda, utils::helpers as utils, world::*,
-};
-use anyhow::Error;
-use solana_client::rpc_client::RpcClient;
-use solana_sdk::{
-    pubkey,
-    pubkey::Pubkey,
-    signature::{Keypair, Signature},
-};
-use std::sync::Arc;
+use crate::{errors::MojoSDKError, state::MojoState, world::*};
 
-const PROGRAM_ID: Pubkey = pubkey!("58sfdJaiSM7Ccr6nHNXXmwbfT6e9s8Zkee6zdRSH8CeS");
+use solana_keypair::Keypair;
+use solana_pubkey::{pubkey, Pubkey};
+use solana_rpc_client::rpc_client::RpcClient;
+
+const PROGRAM_ID: Pubkey = pubkey!("7iMdvW8A4Tw3yxjbXjpx4b8LTW13EQLB4eTmPyqRvxzM");
 
 /// Client Wrapper to interact with the Mojo Solana Program
 pub struct SdkClient {
@@ -25,7 +18,9 @@ pub enum RpcType {
     Main,
     Dev,
     ERMain,
-    ERDev,
+    MBDev, // MagicBlock Devnet
+    ERDev, // Ephemeral Rollup Devnet
+    Surf,  // Localnet surfpool
 }
 
 impl RpcType {
@@ -34,7 +29,9 @@ impl RpcType {
             RpcType::Main => "https://api.mainnet-beta.solana.com",
             RpcType::Dev => "https://api.devnet.solana.com",
             RpcType::ERMain => "",
-            RpcType::ERDev => "",
+            RpcType::MBDev => "https://devnet-rpc.magicblock.app",
+            RpcType::ERDev => "https://devnet.magicblock.app",
+            RpcType::Surf => "http://127.0.0.1:8899",
         }
     }
 }
@@ -48,10 +45,10 @@ impl SdkClient {
     ///
     /// # Example
     /// ```
-    /// use mojo_sdk::{SdkClient, RpcType};
-    /// use solana_sdk::pubkey;
+    /// // use mojo_sdk::{SdkClient, RpcType};
+    /// // use solana_sdk::pubkey;
     ///
-    /// let client = SdkClient::new(RpcType::DEV);
+    /// // let client = SdkClient::new(RpcType::DEV);
     /// ```
     pub fn new(rpc_type: RpcType) -> Self {
         let client = RpcClient::new(rpc_type.url());
@@ -67,11 +64,11 @@ impl SdkClient {
     /// * `initial_state` - Initial state data
     /// # Example
     /// ```
-    /// use mojo_sdk::{SdkClient, RpcType};
-    /// use solana_sdk::pubkey;
+    /// // use mojo_sdk::{SdkClient, RpcType};
+    /// // use solana_sdk::pubkey;
     ///
-    /// let client = SdkClient::new(RpcType::DEV);
-    /// let world = client.create_world(creator_keypair, "New World", Position{x:0, y:0});
+    /// // let client = SdkClient::new(RpcType::DEV);
+    /// // let world = client.create_world(creator_keypair, "New World", Position{x:0, y:0});
     pub fn create_world<T: MojoState>(
         &self,
         creator: &Keypair,
@@ -90,19 +87,34 @@ impl SdkClient {
     /// * `state` - State data to be written
     /// # Example
     /// ```
-    /// use mojo_sdk::{SdkClient, RpcType};
-    /// use solana_sdk::pubkey;
+    /// // use mojo_sdk::{SdkClient, RpcType};
+    /// // use solana_sdk::pubkey;
     ///
-    /// let client = SdkClient::new(RpcType::DEV);
-    /// let world = client.write_state(world, "my beast boxer", creator_keypair, Position{x:0, y:0});
+    /// // let client = SdkClient::new(RpcType::DEV);
+    /// // let world = client.write_state(world, "my beast boxer", creator_keypair, Position{x:0, y:0});
     pub fn write_state<T: MojoState>(
         &self, // client
         world: &World,
         state_name: &str,
         owner: &Keypair,
         state: T,
-    ) -> Result<Signature, MojoSDKError> {
+    ) -> Result<(), MojoSDKError> {
         world.write_state(&self, state_name, owner, state)
+    }
+
+    /// Read the data stored in the world's PDA
+    pub fn read_world<T: MojoState>(&self, world: &World) -> Result<T, MojoSDKError> {
+        world.read_world_state(self)
+    }
+
+    /// Read a delegated state PDA owned by `owner`
+    pub fn read_delegated_state<T: MojoState>(
+        &self,
+        world: &World,
+        state_name: &str,
+        owner: &Pubkey,
+    ) -> Result<T, MojoSDKError> {
+        world.read_delegated_state(self, state_name, owner)
     }
 
     /// Get a reference to the RPC client
