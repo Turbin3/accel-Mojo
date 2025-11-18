@@ -89,10 +89,13 @@ mod er_tests {
         let rpc_er_client = RpcClient::new(RPC_ER_URL);
 
         let payer = read_keypair_file("dev_wallet.json").expect("Couldn't find wallet file");
-        let program_payer = read_keypair_file("/home/eaa/accel_builders/mojo-2/mojo-program/target/deploy/mojo_program-keypair.json").expect("Couldn't find wallet file");
+        let program_payer = read_keypair_file(
+            "/home/eaa/accel_builders/mojo-2/mojo-program/target/deploy/mojo_program-keypair.json",
+        )
+        .expect("Couldn't find wallet file");
 
         // Derive the PDA for the escrow account using the maker's public key and a seed value
-        let combined = encode_packed!(b"birdie", payer.pubkey().as_ref());
+        let combined = encode_packed!(b"birdo", payer.pubkey().as_ref());
         let account_to_create = Pubkey::find_program_address(
             &[&compute_hash(&combined), payer.pubkey().as_ref()],
             &PROGRAM_ID,
@@ -116,16 +119,18 @@ mod er_tests {
             &delegation_program_id,
         )
         .0;
-        
+
         let commit_state_account = Pubkey::find_program_address(
             &[b"commit-state-account", account_to_create.0.as_ref()],
-            &delegation_program_id
-        ).0;
-        
+            &delegation_program_id,
+        )
+        .0;
+
         let commit_state_record = Pubkey::find_program_address(
             &[b"commit-state-record", account_to_create.0.as_ref()],
-            &delegation_program_id
-        ).0;
+            &delegation_program_id,
+        )
+        .0;
 
         // Derive the buffer PDA using [BUFFER, creator_account] with our PROGRAM_ID
         let buffer_account =
@@ -145,7 +150,7 @@ mod er_tests {
             delegation_metadata,
             delegation_record,
             commit_state_account,
-            commit_state_record
+            commit_state_record,
         };
 
         reusable_state
@@ -162,7 +167,7 @@ mod er_tests {
 
         let my_state_data = MyPosition { x: 24, y: 12 };
 
-        let combined = encode_packed!(b"birdie", creator.pubkey().as_ref());
+        let combined = encode_packed!(b"birdo", creator.pubkey().as_ref());
         let digest = compute_hash(&combined);
 
         let mojo_data = crate::state::GenIxHandler {
@@ -199,7 +204,6 @@ mod er_tests {
             &[&creator],
             recent_blockhash,
         );
-        
 
         let signature = state
             .rpc_client
@@ -209,8 +213,6 @@ mod er_tests {
             "Success! Check out your TX here:\nhttps://explorer.solana.com/tx/{}/?cluster=devnet",
             signature
         );
-
-
     }
 
     #[test]
@@ -226,14 +228,13 @@ mod er_tests {
         let system_program = state.system_program;
         let delegate_id = Pubkey::new_from_array(DELEGATION_PROGRAM_ID);
 
-
         // Derive the buffer PDA using [BUFFER, creator_account] with our PROGRAM_ID
         let buffer_account =
             Pubkey::find_program_address(&[BUFFER, creator_account.0.as_ref()], &PROGRAM_ID).0;
 
         let my_state_data: MyPosition = MyPosition { x: 24, y: 12 };
 
-        let combined = encode_packed!(b"birdie", creator.pubkey().as_ref());
+        let combined = encode_packed!(b"birdo", creator.pubkey().as_ref());
         let digest = compute_hash(&combined);
 
         let mojo_data = crate::state::GenIxHandler {
@@ -267,7 +268,7 @@ mod er_tests {
                 AccountMeta::new(delegation_record, false), // delegation record
                 AccountMeta::new(delegation_metadata, false), // delegation metadata
                 AccountMeta::new(system_program, false), // system program
-                AccountMeta::new(delegate_id, false), // system program
+                AccountMeta::new(delegate_id, false),    // system program
                 AccountMeta::new(EU_VALIDATOR, false),   // a different Validator for speed
             ],
             data: delegate_ix_data,
@@ -307,7 +308,7 @@ mod er_tests {
 
         let my_update_state_data: MyPosition = MyPosition { x: 24, y: 12 };
 
-        let combined = encode_packed!(b"birdie", creator.pubkey().as_ref());
+        let combined = encode_packed!(b"birdo", creator.pubkey().as_ref());
         let digest = compute_hash(&combined);
 
         let mojo_data = crate::state::GenIxHandler {
@@ -347,7 +348,7 @@ mod er_tests {
 
         let transaction = Transaction::new_signed_with_payer(
             &[update_ix],
-            Some((&creator.pubkey())),
+            Some(&creator.pubkey()),
             &[&creator],
             recent_blockhash,
         );
@@ -369,20 +370,10 @@ mod er_tests {
         let creator = state.creator;
         let creator_account = state.account_to_create;
         let owner_program = state.owner_program;
-        let program_payer = state.program_payer;
-        // let delegation_record = state.delegation_record;
-        // let delegation_metadata = state.delegation_metadata;
-        // let system_program = state.system_program;
-        // let commit_state = state.commit_state_account;
-        // let commit_record = state.commit_state_record;
 
         let my_update_state_data: MyPosition = MyPosition { x: 24, y: 12 };
 
-        // Derive the buffer PDA using [BUFFER, creator_account] with our PROGRAM_ID
-        // let buffer_account =
-        //     Pubkey::find_program_address(&[BUFFER, creator_account.0.as_ref()], &PROGRAM_ID).0;
-
-        let combined = encode_packed!(b"birdie", creator.pubkey().as_ref());
+        let combined = encode_packed!(b"birdo", creator.pubkey().as_ref());
         let digest = compute_hash(&combined);
 
         let mojo_data = crate::state::GenIxHandler {
@@ -393,35 +384,28 @@ mod er_tests {
         let commit_ix_data = [
             vec![crate::instructions::MojoInstructions::Commit as u8],
             mojo_data.to_bytes(),
-            my_update_state_data.to_bytes(),
+            // my_update_state_data.to_bytes(),
+            // vec![1, 0, 0, 0]
         ]
         .concat();
-
-        // let fees_vault = validator_fees_vault_pda_from_validator(EU_VALIDATOR.as_array());
 
         let recent_blockhash = state
             .rpc_er_client
             .get_latest_blockhash()
             .expect("failed to get recent blockhash");
 
-        // let delegation_program_id = Pubkey::new_from_array(DELEGATION_PROGRAM_ID);
 
-        // ephemeral_rollups_pinocchio::pda::
-        // log!("{}", creator.pubkey());
         let commit_ix = Instruction {
-            // program_id: Pubkey::new_from_array(MAGIC_PROGRAM_ID),
-            program_id: PROGRAM_ID,
+            program_id: owner_program,
             accounts: vec![
-                // AccountMeta::new(program_payer.pubkey(), true),
+                // 0xAbim: used definite ordering for the commit tests.
                 AccountMeta::new(creator.pubkey(), true),
+                AccountMeta::new(Pubkey::new_from_array(MAGIC_CONTEXT_ID), false),
                 AccountMeta::new(creator_account.0, false),
-                AccountMeta::new_readonly(Pubkey::new_from_array(MAGIC_CONTEXT_ID), false),
                 AccountMeta::new_readonly(Pubkey::new_from_array(MAGIC_PROGRAM_ID), false),
-                // AccountMeta::new(state.owner_program, true),
-                // AccountMeta::new_readonly(Pubkey::new_from_array(MAGIC_PROGRAM_ID), false),
             ],
-            data: vec![1, 0, 0, 0],  // ALLOW_UNDELEGATION_DATA
-            // data: commit_ix_data,
+            // data: vec![1, 0, 0, 0],  // ALLOW_UNDELEGATION_DATA
+            data: commit_ix_data,
         };
 
         let transaction = Transaction::new_signed_with_payer(
@@ -454,14 +438,14 @@ mod er_tests {
         let delegation_metadata = state.delegation_metadata;
         let system_program = state.system_program;
         log!("this passed 2");
-        
-         let undelegate_buffer_account =
+
+        let undelegate_buffer_account =
             Pubkey::find_program_address(&[BUFFER, creator_account.0.as_ref()], &PROGRAM_ID).0;
 
         let commit_state = state.commit_state_account;
         let commit_record = state.commit_state_record;
 
-        let combined = encode_packed!(b"birdie", creator.pubkey().as_ref());
+        let combined = encode_packed!(b"birdo", creator.pubkey().as_ref());
         let digest = compute_hash(&combined);
 
         let mojo_data = crate::state::GenIxHandler {
@@ -469,7 +453,6 @@ mod er_tests {
             size: my_update_state_data.length().to_le_bytes(),
         };
         log!("this passed 3");
-
 
         // const MAX_LEN: usize = 128;
         // let buffer_account =
@@ -489,11 +472,10 @@ mod er_tests {
         //     mojo_data.to_bytes(),
         //     my_update_state_data.to_bytes(),
         // ].concat();
-        
+
         // The delegation program's commit_and_undelegate discriminator
         let undelegate_ix_data = vec![2, 0, 0, 0];
         log!("this passed nooooo");
-
 
         let normal_fee = pubkey!("7JrkjmZPprHwtuvtuGTXp9hwfGYFAQLnLeFM52kqAgXg");
         let validator_fee = pubkey!("7EUuuQDZRKar7dUESDynEEKkXity3TeqGdq1TNqefaAn");
@@ -509,9 +491,11 @@ mod er_tests {
             program_id: Pubkey::new_from_array(MAGIC_PROGRAM_ID),
             accounts: vec![
                 AccountMeta::new(creator.pubkey(), true),
-                AccountMeta::new(Pubkey::new_from_array(ephemeral_rollups_pinocchio::consts::MAGIC_CONTEXT_ID), false),  // magic context
-                AccountMeta::new(creator_account.0, false),  // delegated account 1
-
+                AccountMeta::new(
+                    Pubkey::new_from_array(ephemeral_rollups_pinocchio::consts::MAGIC_CONTEXT_ID),
+                    false,
+                ), // magic context
+                AccountMeta::new(creator_account.0, false), // delegated account 1
                 // AccountMeta::new_readonly(owner_program, false),
                 AccountMeta::new(undelegate_buffer_account, false),
                 // AccountMeta::new(EU_VALIDATOR, true),
@@ -526,12 +510,10 @@ mod er_tests {
                 AccountMeta::new_readonly(system_program, false),
                 // AccountMeta::new_readonly(Pubkey::new_from_array(ephemeral_rollups_pinocchio::consts::MAGIC_CONTEXT_ID),false,),
                 // AccountMeta::new_readonly(Pubkey::new_from_array(ephemeral_rollups_pinocchio::consts::MAGIC_PROGRAM_ID),false,),
-                
             ],
-            data: vec![2, 0, 0, 0],  // ALLOW_UNDELEGATION_DATA
-            // data: undelegate_ix_data,
+            data: vec![2, 0, 0, 0], // ALLOW_UNDELEGATION_DATA
+                                    // data: undelegate_ix_data,
         };
-
 
         let transaction = Transaction::new_signed_with_payer(
             &[undelegate_ix],
