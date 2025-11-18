@@ -6,11 +6,12 @@ use crate::{
     SdkClient,
 };
 
+use solana_client::client_error::{ClientError, ClientErrorKind};
+use solana_client::rpc_request::RpcError;
 use solana_instruction::{AccountMeta, Instruction};
 use solana_keypair::Keypair;
 use solana_message::Message;
 use solana_pubkey::Pubkey;
-use solana_rpc_client::rpc_client::RpcClient;
 use solana_signer::Signer;
 use solana_system_program::id as system_program_id;
 use solana_sysvar::rent::ID as rent_id;
@@ -20,8 +21,6 @@ use solana_transaction::Transaction;
 pub struct World {
     /// The PDA of the game world
     pub world_pda: Pubkey,
-    /// The Keypair of the world's creator, needed to sign for state changes.
-    pub creator_keypair: Keypair,
     pub world_seed_hash: [u8; 32],
 }
 
@@ -72,49 +71,14 @@ impl World {
             data: instruction_data,
         };
 
-        let message = Message::new(&[ix], Some(&creator_pubkey));
-
-        // Create and send the transaction
-        let recent_blockhash = client
-            .client
-            .get_latest_blockhash()
-            .map_err(|_e| MojoSDKError::SolanaClient())?;
-
-        let transaction = Transaction::new(&[creator], message, recent_blockhash);
-
-        // Send and confirm
-        client
-            .client
-            .send_and_confirm_transaction(&transaction)
-            .map_err(|e| MojoSDKError::TransactionFailed(e.to_string()))?;
+        Self::submit_instructions(client, creator, vec![ix])?;
 
         Ok(World {
-            creator_keypair: Keypair::from_bytes(&creator.to_bytes()).unwrap(), // Simple clone //
-            // TODO: This
-            // should not be
-            // exposed
             world_pda,
             world_seed_hash: seed_bytes,
         })
     }
 
-    /// Write state to a delegated account (PDA) on-chain
-    ///
-    /// # Arguments
-    /// * `seed` - The seed string used to derive the PDA (e.g., "angry_bird")
-    /// * `owner` - The keypair that owns/created this state (must sign the transaction)
-    /// * `state` - The state data to write to the account
-    ///
-    /// # Example
-    /// ```no_run
-    /// // use mojo_sdk::{World, MojoState};
-    /// // use solana_sdk::signature::Keypair;
-    /// // fn example(world: World, owner: Keypair, state: impl MojoState) -> Result<(),
-    /// // MojoSDKError> {
-    /// // world.write_state(client, "my_state", &owner, state)?;
-    /// // Ok(())
-    /// // }
-    /// ```
     pub fn write_state<T: MojoState>(
         &self,
         client: &SdkClient,
@@ -129,78 +93,28 @@ impl World {
         let (account_pda, state_seed_input, _seed_hash) =
             self.derive_state_pda(state_name, &owner_pubkey, client);
 
-        match client.client.get_account(&account_pda) {
-            Ok(_fetched_pda) => {
-                // Build the instruction
-                let instruction = UpdateDelegatedAccountBuilder::new(
+        let account_status = Self::delegated_account_status(client, &account_pda)?;
+
+        match account_status {
+            DelegatedAccountStatus::Exists => {
+                let update_ix = Self::build_update_state_instruction(
                     client.program_id,
                     owner_pubkey,
                     account_pda,
                     &state_seed_input,
-                    state_data,
-                )
-                .build()?;
-
-                let message = Message::new(&[instruction], Some(&owner_pubkey));
-
-                // Create and send the transaction
-                let recent_blockhash = client
-                    .client
-                    .get_latest_blockhash()
-                    .map_err(|_e| MojoSDKError::SolanaClient())?;
-
-                let transaction = Transaction::new(&[owner], message, recent_blockhash);
-
-                // Send and confirm
-                client
-                    .client
-                    .send_and_confirm_transaction(&transaction)
-                    .map_err(|e| MojoSDKError::TransactionFailed(e.to_string()))?;
-
-                // log::info!("✅ State updated successfully. Signature: {}", signature);
-
-                Ok(())
+                    &state_data,
+                )?;
+                Self::submit_instructions(client, owner, vec![update_ix])
             }
-            // Account does not exist, create new one
-            Err(_) => {
-                // Prepare the instruction data
-                let mojo_data = GenIxHandler::new(&state_seed_input, state_data.len());
-
-                let instruction_data = [
-                    vec![MojoInstructionDiscriminator::CreateAccount as u8], // Discriminator
-                    bytemuck::bytes_of(&mojo_data).to_vec(),
-                    state_data,
-                ]
-                .concat();
-
-                // 4. Build the instruction
-                let ix = Instruction {
-                    program_id: client.program_id,
-                    accounts: vec![
-                        AccountMeta::new(owner_pubkey, true),
-                        AccountMeta::new(account_pda, false),
-                        AccountMeta::new(system_program_id(), false),
-                        AccountMeta::new(rent_id, false),
-                    ],
-                    data: instruction_data,
-                };
-
-                let message = Message::new(&[ix], Some(&owner_pubkey));
-
-                // Create and send the transaction
-                let recent_blockhash = client
-                    .client
-                    .get_latest_blockhash()
-                    .map_err(|_e| MojoSDKError::SolanaClient())?;
-
-                let transaction = Transaction::new(&[owner], message, recent_blockhash);
-
-                // Send and confirm
-                client
-                    .client
-                    .send_and_confirm_transaction(&transaction)
-                    .map_err(|e| MojoSDKError::TransactionFailed(e.to_string()))?;
-                Ok(())
+            DelegatedAccountStatus::Missing => {
+                let create_ix = Self::build_create_state_instruction(
+                    client.program_id,
+                    owner_pubkey,
+                    account_pda,
+                    &state_seed_input,
+                    &state_data,
+                );
+                Self::submit_instructions(client, owner, vec![create_ix])
             }
         }
     }
@@ -263,4 +177,104 @@ impl World {
 
         Ok(acc.data)
     }
+
+    fn delegated_account_status(
+        client: &SdkClient,
+        account: &Pubkey,
+    ) -> Result<DelegatedAccountStatus, MojoSDKError> {
+        match client.client.get_account(account) {
+            Ok(acc) => {
+                if acc.owner != client.program_id {
+                    return Err(MojoSDKError::InvalidAccountOwner(format!(
+                        "expected {}, got {}",
+                        client.program_id, acc.owner
+                    )));
+                }
+                Ok(DelegatedAccountStatus::Exists)
+            }
+            Err(err) => {
+                if Self::is_account_missing(&err) {
+                    Ok(DelegatedAccountStatus::Missing)
+                } else {
+                    Err(MojoSDKError::SolanaSdk(err.to_string()))
+                }
+            }
+        }
+    }
+
+    fn is_account_missing(err: &ClientError) -> bool {
+        match err.kind() {
+            ClientErrorKind::RpcError(RpcError::ForUser(message)) => {
+                message.contains("AccountNotFound") || message.contains("could not find account")
+            }
+            _ => false,
+        }
+    }
+
+    fn build_create_state_instruction(
+        program_id: Pubkey,
+        owner: Pubkey,
+        account_pda: Pubkey,
+        seed_input: &Vec<u8>,
+        state_data: &[u8],
+    ) -> Instruction {
+        let mojo_data = GenIxHandler::new(seed_input, state_data.len());
+
+        Instruction {
+            program_id,
+            accounts: vec![
+                AccountMeta::new(owner, true),
+                AccountMeta::new(account_pda, false),
+                AccountMeta::new(system_program_id(), false),
+                AccountMeta::new(rent_id, false),
+            ],
+            data: [
+                vec![MojoInstructionDiscriminator::CreateAccount as u8],
+                bytemuck::bytes_of(&mojo_data).to_vec(),
+                state_data.to_vec(),
+            ]
+            .concat(),
+        }
+    }
+
+    fn build_update_state_instruction(
+        program_id: Pubkey,
+        owner: Pubkey,
+        account_pda: Pubkey,
+        seed_input: &Vec<u8>,
+        state_data: &[u8],
+    ) -> Result<Instruction, MojoSDKError> {
+        UpdateDelegatedAccountBuilder::new(
+            program_id,
+            owner,
+            account_pda,
+            seed_input,
+            state_data.to_vec(),
+        )
+        .build()
+    }
+
+    fn submit_instructions(
+        client: &SdkClient,
+        signer: &Keypair,
+        instructions: Vec<Instruction>,
+    ) -> Result<(), MojoSDKError> {
+        let message = Message::new(&instructions, Some(&signer.pubkey()));
+        let recent_blockhash = client
+            .client
+            .get_latest_blockhash()
+            .map_err(|_e| MojoSDKError::SolanaClient())?;
+        let transaction = Transaction::new(&[signer], message, recent_blockhash);
+
+        client
+            .client
+            .send_and_confirm_transaction(&transaction)
+            .map_err(|e| MojoSDKError::TransactionFailed(e.to_string()))?;
+        Ok(())
+    }
+}
+
+enum DelegatedAccountStatus {
+    Exists,
+    Missing,
 }
