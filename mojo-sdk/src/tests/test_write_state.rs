@@ -17,14 +17,9 @@ mod tests {
     };
 
     use crate::types::derive_pda;
-    use solana_instruction::{AccountMeta, Instruction};
     use solana_keypair::Keypair;
-    use solana_message::Message;
     use solana_pubkey::Pubkey;
     use solana_signer::{EncodableKey, Signer};
-    use solana_system_program;
-    use solana_sysvar::rent::ID as RENT_ID;
-    use solana_transaction::Transaction;
 
     // use crate::instructions::MojoInstructions::CreateAccount;
 
@@ -54,8 +49,7 @@ mod tests {
      * Tests assume use of a funded key
      */
     #[test]
-    #[ignore]
-    pub fn test_create_world() -> Result<(), Error> {
+    pub fn test_write_state() -> Result<(), Error> {
         let (client, creator) = setup();
         let creator_pubkey = creator.pubkey();
         msg!("Creator public key: {}", creator_pubkey);
@@ -86,52 +80,44 @@ mod tests {
             .unwrap();
         assert_eq!(fetched_world_state, starting_position);
 
+        // Create: A new Player state is created because it does not exist yet
         // create a delegated state account manually via CreateAccount instruction
         let state_name = "player_position";
-        let player_state = Position { x: 9, y: 9 };
-        let state_seed_input = crate::encode_packed!(
-            b"state",
-            world.world_seed_hash.as_ref(),
-            state_name.as_bytes(),
-            creator_pubkey.as_ref()
-        );
-        let state_seed_hash = utils::compute_hash(&state_seed_input);
-        let (state_pda, _bump) = derive_pda(
-            &[&state_seed_hash, creator_pubkey.as_ref()],
-            &client.program_id,
-        );
+        let player_state = Position { x: 8, y: 9 };
 
-        let player_state_bytes = player_state.serialize().unwrap();
-        let gen_ix = GenIxHandler::new(&state_seed_input, player_state_bytes.len());
-        let create_state_ix = Instruction {
-            program_id: client.program_id,
-            accounts: vec![
-                AccountMeta::new(creator_pubkey, true),
-                AccountMeta::new(state_pda, false),
-                AccountMeta::new(solana_system_program::id(), false),
-                AccountMeta::new(Pubkey::new_from_array(RENT_ID.to_bytes()), false),
-            ],
-            data: [
-                vec![MojoInstructionDiscriminator::CreateAccount as u8],
-                bytemuck::bytes_of(&gen_ix).to_vec(),
-                player_state_bytes.clone(),
-            ]
-            .concat(),
-        };
-
-        let recent_blockhash = client.client.get_latest_blockhash().unwrap();
-        let message = Message::new(&[create_state_ix], Some(&creator_pubkey));
-        let transaction = Transaction::new(&[&creator], message, recent_blockhash);
+        // Use write_state
         client
-            .client
-            .send_and_confirm_transaction(&transaction)
-            .expect("failed to create delegated state");
+            .write_state(&world, state_name, &creator, player_state)
+            .map_err(|e| e.to_string())
+            .unwrap();
 
         let fetched_player_state: Position = client
             .read_delegated_state(&world, state_name, &creator_pubkey)
             .map_err(|e| e.to_string())
             .unwrap();
-        assert_eq!(fetched_player_state, player_state);
+        assert_eq!(
+            fetched_player_state, player_state,
+            "Player state is not created successfully as expected"
+        );
+
+        // Rewrite: Give player a new position
+        let new_player_state = Position { x: 8, y: 19 };
+
+        // Use write_state
+        client
+            .write_state(&world, state_name, &creator, new_player_state)
+            .map_err(|e| e.to_string())
+            .unwrap();
+
+        let fetched_player_state: Position = client
+            .read_delegated_state(&world, state_name, &creator_pubkey)
+            .map_err(|e| e.to_string())
+            .unwrap();
+        assert_eq!(
+            fetched_player_state, new_player_state,
+            "Player state is not overridden successfully as expected"
+        );
+
         Ok(())
     }
 }

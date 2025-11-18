@@ -129,35 +129,80 @@ impl World {
         let (account_pda, state_seed_input, _seed_hash) =
             self.derive_state_pda(state_name, &owner_pubkey, client);
 
-        // Build the instruction
-        let instruction = UpdateDelegatedAccountBuilder::new(
-            client.program_id,
-            owner_pubkey,
-            account_pda,
-            &state_seed_input,
-            state_data,
-        )
-        .build()?;
+        match client.client.get_account(&account_pda) {
+            Ok(_fetched_pda) => {
+                // Build the instruction
+                let instruction = UpdateDelegatedAccountBuilder::new(
+                    client.program_id,
+                    owner_pubkey,
+                    account_pda,
+                    &state_seed_input,
+                    state_data,
+                )
+                .build()?;
 
-        let message = Message::new(&[instruction], Some(&owner_pubkey));
+                let message = Message::new(&[instruction], Some(&owner_pubkey));
 
-        // Create and send the transaction
-        let recent_blockhash = client
-            .client
-            .get_latest_blockhash()
-            .map_err(|_e| MojoSDKError::SolanaClient())?;
+                // Create and send the transaction
+                let recent_blockhash = client
+                    .client
+                    .get_latest_blockhash()
+                    .map_err(|_e| MojoSDKError::SolanaClient())?;
 
-        let transaction = Transaction::new(&[owner], message, recent_blockhash);
+                let transaction = Transaction::new(&[owner], message, recent_blockhash);
 
-        // Send and confirm
-        client
-            .client
-            .send_and_confirm_transaction(&transaction)
-            .map_err(|e| MojoSDKError::TransactionFailed(e.to_string()))?;
+                // Send and confirm
+                client
+                    .client
+                    .send_and_confirm_transaction(&transaction)
+                    .map_err(|e| MojoSDKError::TransactionFailed(e.to_string()))?;
 
-        // log::info!("✅ State updated successfully. Signature: {}", signature);
+                // log::info!("✅ State updated successfully. Signature: {}", signature);
 
-        Ok(())
+                Ok(())
+            }
+            // Account does not exist, create new one
+            Err(_) => {
+                // Prepare the instruction data
+                let mojo_data = GenIxHandler::new(&state_seed_input, state_data.len());
+
+                let instruction_data = [
+                    vec![MojoInstructionDiscriminator::CreateAccount as u8], // Discriminator
+                    bytemuck::bytes_of(&mojo_data).to_vec(),
+                    state_data,
+                ]
+                .concat();
+
+                // 4. Build the instruction
+                let ix = Instruction {
+                    program_id: client.program_id,
+                    accounts: vec![
+                        AccountMeta::new(owner_pubkey, true),
+                        AccountMeta::new(account_pda, false),
+                        AccountMeta::new(system_program_id(), false),
+                        AccountMeta::new(rent_id, false),
+                    ],
+                    data: instruction_data,
+                };
+
+                let message = Message::new(&[ix], Some(&owner_pubkey));
+
+                // Create and send the transaction
+                let recent_blockhash = client
+                    .client
+                    .get_latest_blockhash()
+                    .map_err(|_e| MojoSDKError::SolanaClient())?;
+
+                let transaction = Transaction::new(&[owner], message, recent_blockhash);
+
+                // Send and confirm
+                client
+                    .client
+                    .send_and_confirm_transaction(&transaction)
+                    .map_err(|e| MojoSDKError::TransactionFailed(e.to_string()))?;
+                Ok(())
+            }
+        }
     }
 
     /// Read the current state stored in a delegated account
