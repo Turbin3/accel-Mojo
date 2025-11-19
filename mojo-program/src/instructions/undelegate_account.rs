@@ -1,49 +1,34 @@
-use pinocchio::{
-    account_info::AccountInfo, instruction::Signer, program_error::ProgramError, pubkey,
-    pubkey::find_program_address, seeds, ProgramResult,
+use ephemeral_rollups_pinocchio::{
+    instruction::commit_and_undelegate_accounts, utils::create_schedule_commit_ix,
 };
-use pinocchio_log::log;
+use pinocchio::{account_info::AccountInfo, program_error::ProgramError, ProgramResult};
 
-use crate::state::GenIxHandler;
-
-pub fn process_undelegate_account(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
-    log!("i was here");
-    let [creator, mojo_account_pda, magic_context, magic_program] = accounts else {
+#[allow(clippy::cloned_ref_to_slice_refs)]
+pub fn process_undelegate_account(
+    accounts: &[AccountInfo],
+    instruction_data: &[u8],
+) -> ProgramResult {
+    /// Undelegation callback invoked by the delegation program.
+    /// Expected accounts (in order used below):
+    /// 0. []         Payer (original authority for the delegated PDA)
+    /// 1. [writable] Delegated PDA account to be restored (Creator Account PDA)
+    /// 2. []         Owner program (this program ID)
+    /// 3. [signer]   Undelegate buffer PDA (holds the snapshot of the delegated account)
+    /// 4. []         System program
+    // need to discuss , how to handle magic context and magic program
+    let [creator, creator_account, magic_context, magic_program] = accounts
+    else {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
 
-    // 0xAbim: Validate creator is a signer
-    if !creator.is_signer() {
-        return Err(ProgramError::MissingRequiredSignature);
-    }
-    // check that account_to_create is empty
-    assert!(
-        !&mojo_account_pda.data_is_empty(),
-        "Account should be empty"
-    );
+    // 0xAbim: Used the commit scheduler UTIL to create the commit and undelegate context
 
-    let mojo_data = &data[0..GenIxHandler::LEN];
-    let mojo_ser_data = bytemuck::from_bytes::<GenIxHandler>(mojo_data);
-
-    let seeds_data = &mojo_ser_data.seeds;
-    // let seed_bump = [bump];
-    let seeds = &[seeds_data, creator.key().as_ref()];
-
-    let (derived_pda, bump) = pubkey::find_program_address(seeds, &crate::id());
-
-    assert_eq!(
-        &derived_pda,
-        mojo_account_pda.key(),
-        "You provided the wrong user pda"
-    );
-
-    ephemeral_rollups_pinocchio::instruction::commit_and_undelegate_accounts(
+    create_schedule_commit_ix(
         creator,
-        &accounts[1..2], // Some pretty issues here.
+        &accounts[1..2],
         magic_context,
         magic_program,
-    )
-    .map_err(|_| ProgramError::InvalidAccountData)?;
-
+        true,
+    )?;
     Ok(())
 }

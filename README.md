@@ -1,56 +1,132 @@
-# Accel-Mojo
+# Mojo
 
-This is the Solana Program which is an account factory for the Mojo-sdk written with Pinocchio, bytemuck, sha2.
+A Solana game engine SDK that lets developers build on-chain games without blockchain expertise. Powered by [MagicBlock's Ephemeral Rollups](https://magicblock.gg) for 1ms gameplay with Solana finality.
 
-## Building the Program
+## Overview
 
-_🚨 it is expected that you have already set up your Solana cli_
+Mojo abstracts blockchain complexity through a simple API: `create_world()`, `read_state()`, `write_state()`. Games run on ephemeral rollups for instant response times, then commit final state to Solana for persistence.
+
+**Stack:**
+- **mojo-program**: On-chain Solana program (Pinocchio, account factory pattern)
+- **mojo-sdk**: Rust SDK for game developers
+- **game-examples**: Reference implementations (Tic-Tac-Toe, Pong, Moving-Box) built with Bevy
+
+**Program ID**: `3zt2gQuNsVRG8PAbZdYS2mgyzhUqG8sNwcaGJ1DYvECo`
+
+## Quick Start
+
+### Prerequisites
+- [Rust](https://www.rust-lang.org/tools/install) installed
+- [Solana CLI](https://docs.solana.com/cli/install-solana-cli-tools) configured
+
+### 1. Build & Deploy Program
 
 ```bash
- # enter the program directory
 cd mojo-program
- # set environment to devnet
+
+# Configure Solana CLI for devnet
 solana config set --url devnet
- # build an .so file to deploy
+
+# Build the program
 cargo build-sbf
-```
 
-now make sure the address at `target/deploy/mojo_program-keypair.json` \
- can be checked with
-
-```bash
+# Verify program ID matches lib.rs
 solana address -k target/deploy/mojo_program-keypair.json
-```
+# Update lib.rs if needed: pinocchio_pubkey::declare_id!("YOUR_ADDRESS");
 
-is the same as what you have in your `pinocchio_pubkey::declare_id!("7iMdvW8A4Tw3yxjbXjpx4b8LTW13EQLB4eTmPyqRvxzM");` in `lib.rs` \
-if not, just paste up what's in the terminal from the last command into that string `pinocchio_pubkey::declare_id!("YourNewAddress111111111111111111111111111111");`
-
-save and deploy the program
-
-```bash
- # deploy the program to devnet
+# Deploy to devnet
 solana program deploy --program-id target/deploy/mojo_program-keypair.json target/deploy/mojo_program.so
 ```
 
-## Running the tests
-
-_🚨 it is expected that you have already set up your Solana cli_
+### 2. Run Tests
 
 ```bash
- # enter the program directory
 cd mojo-program
- # set environment to devnet
-solana config set --url devnet
- # create a new keypair to test on devnet
+
+# Create test wallet
 solana-keygen new -s -o dev_wallet.json
- # airdrop some SOL to that wallet
+
+# Fund wallet
 solana airdrop 1 $(solana address -k dev_wallet.json)
- # build and test the program
+
+# Run tests
 cargo build-sbf && cargo test -- --nocapture
 ```
 
-Moodboard 1 - https://excalidraw.com/#room=a46b67cad46194a6070f,KQR06GWzcammufK6P9A7uQ
+### 3. Run Example Games
 
-Tasks Sheet - https://docs.google.com/spreadsheets/d/1TqDlBIDCJ5K4CVYf0-OmwYorXIHBadmHVW4ndQMU79w/edit?hl=en-GB&gid=0#gid=0
+```bash
+# Tic-Tac-Toe
+cd game-examples/tic-tac-toe
+cargo run
 
-Scratchboard - https://gist.github.com/inspi-writer001/aa5020faafd44e320a0a0e0c5e71d344
+# Pong
+cd game-examples/pong
+cargo run
+
+# Moving Box
+cd game-examples/moving-box
+cargo run
+```
+
+## SDK Usage
+
+```rust
+use mojo_sdk::*;
+
+// Define game state
+#[derive(Pod, Zeroable, Copy, Clone)]
+#[repr(C)]
+struct GameState {
+    score: u64,
+    turn: u8,
+}
+impl_mojo_state_pod!(GameState);
+
+// Initialize client & create world
+let client = SdkClient::new(RpcType::ERDev);
+let creator = read_keypair_file("wallet.json")?;
+let world = client.create_world(&creator, "my_game", GameState { score: 0, turn: 1 })?;
+
+// Update state (runs on ephemeral rollup)
+client.write_state(&world, "game_state", &creator, GameState { score: 100, turn: 2 })?;
+
+// Commit to Solana
+world.commit_and_undelegate()?;
+```
+
+## Project Structure
+
+```
+mojo-2/
+├── mojo-program/       # Solana program (Pinocchio)
+│   ├── src/
+│   │   ├── instructions/   # Create, Delegate, Update, Commit, Undelegate
+│   │   ├── state.rs        # Account schemas
+│   │   └── lib.rs          # Entry point
+│   └── Cargo.toml
+├── mojo-sdk/           # Client library
+│   ├── src/
+│   │   ├── client.rs       # SdkClient
+│   │   ├── sdk/world.rs    # World container
+│   │   └── sdk/state.rs    # MojoState trait
+│   └── Cargo.toml
+└── game-examples/      # Bevy game templates
+    ├── tic-tac-toe/
+    ├── pong/
+    └── moving-box/
+```
+
+## Key Features
+
+- **Ephemeral Rollups Integration**: 1ms block times during gameplay, Solana finality on commit
+- **Developer-Friendly API**: No Solana program writing required
+- **Generic State Types**: Any type implementing `MojoState` works
+- **Account Factory Pattern**: Deterministic PDAs via SHA256 seeding
+- **Bevy Game Engine Support**: ECS architecture for game logic
+
+## Resources
+
+- [Moodboard](https://excalidraw.com/#room=a46b67cad46194a6070f,KQR06GWzcammufK6P9A7uQ)
+- [Tasks Sheet](https://docs.google.com/spreadsheets/d/1TqDlBIDCJ5K4CVYf0-OmwYorXIHBadmHVW4ndQMU79w/edit?hl=en-GB&gid=0#gid=0)
+- [Scratchboard](https://gist.github.com/inspi-writer001/aa5020faafd44e320a0a0e0c5e71d344)
