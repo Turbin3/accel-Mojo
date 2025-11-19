@@ -17,8 +17,8 @@ pub use undelegate_account::*;
 pub enum MojoInstructions {
     // Initialize,
     CreateAccount,
-    DelegateAccount,
     Commit,
+    DelegateAccount,
     UpdateDelegatedAccount,
     UndelegateAccount,
 }
@@ -30,8 +30,8 @@ impl TryFrom<&u8> for MojoInstructions {
         match value {
             // 0 => Ok(MojoInstructions::Initialize),
             0 => Ok(MojoInstructions::CreateAccount),
-            1 => Ok(MojoInstructions::DelegateAccount),
-            2 => Ok(MojoInstructions::Commit),
+            1 => Ok(MojoInstructions::Commit),
+            2 => Ok(MojoInstructions::DelegateAccount),
             3 => Ok(MojoInstructions::UpdateDelegatedAccount),
             4 => Ok(MojoInstructions::UndelegateAccount),
             _ => Err(pinocchio::program_error::ProgramError::InvalidInstructionData),
