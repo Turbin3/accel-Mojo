@@ -25,7 +25,7 @@ pub fn process_undelegate_account(
 
     create_schedule_commit_ix(
         creator,
-        &[creator_account.clone()],
+        &accounts[1..2],
         magic_context,
         magic_program,
         true,

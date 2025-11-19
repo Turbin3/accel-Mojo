@@ -13,7 +13,7 @@ pub fn process_commit_instruction(
     // 0xAbim: Used the commit scheduler UTIL to create the commit context
     create_schedule_commit_ix(
         creator,
-        &[creator_account.clone()],
+        &accounts[1..2],
         magic_context,
         magic_program,
         false,
