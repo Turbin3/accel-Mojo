@@ -1,6 +1,8 @@
 # Accel-Mojo
 
 This is the Solana Program which is an account factory for the Mojo-sdk written with Pinocchio, bytemuck, sha2.
+<img width="1001" height="661" alt="image" src="https://github.com/user-attachments/assets/ede36f12-9232-4cab-a8e2-34f218d269e3" />
+
 
 ## Building the Program
 
